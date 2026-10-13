@@ -1,29 +1,41 @@
-// Nilai yang dianggap kosong saat teknisi mengisi field
+// Nilai yang dianggap kosong
 const EMPTY_VALUES = ["", "-"];
 
-// Samakan format label supaya "*No Tag*" dan "no tag" tetap dianggap sama
+// Rapikan label, nomor urut "1." di depan diabaikan
 function normalizeLabel(label) {
-    return label.toLowerCase().replace(/[\s*_]/g, "");
+    return label.toLowerCase().replace(/^\s*\d+[.)]/, "").replace(/[\s*_]/g, "");
 }
 
-// Ambil isi field dari baris "Label: isi", hasilnya null kalau label tidak ada atau kosong
+// Label di baris "Label: isi", null kalau tidak ada ":"
+function labelOf(line) {
+    const separatorIndex = line.indexOf(":");
+    return separatorIndex === -1 ? null : normalizeLabel(line.slice(0, separatorIndex));
+}
+
+// Ambil isi field, null kalau kosong
 export function extractField(messageText, label) {
     const expectedLabel = normalizeLabel(label);
+    const line = messageText.split("\n").find((line) => labelOf(line) === expectedLabel);
 
-    for (const line of messageText.split("\n")) {
-        const separatorIndex = line.indexOf(":");
-
-        if (separatorIndex === -1) {
-            continue;
-        }
-
-        if (normalizeLabel(line.slice(0, separatorIndex)) !== expectedLabel) {
-            continue;
-        }
-
-        const value = line.slice(separatorIndex + 1).trim();
-        return EMPTY_VALUES.includes(value) ? null : value;
+    if (!line) {
+        return null;
     }
 
-    return null;
+    const value = line.slice(line.indexOf(":") + 1).trim();
+    return EMPTY_VALUES.includes(value) ? null : value;
+}
+
+// Pecah pesan per blok, tiap blok diawali baris label
+export function splitByField(messageText, label) {
+    const expectedLabel = normalizeLabel(label);
+    const blocks = [];
+
+    for (const line of messageText.split("\n")) {
+        if (labelOf(line) === expectedLabel) {
+            blocks.push([]);
+        }
+        blocks.at(-1)?.push(line);
+    }
+
+    return blocks.map((lines) => lines.join("\n"));
 }
