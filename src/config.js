@@ -1,11 +1,11 @@
 const REQUIRED_ENV_KEYS = [
     "RED_TAG_SPREADSHEET_ID",
     "RED_TAG_SHEET_NAME",
-    // library Google otomatis memakai variabel ini untuk file service account
-    "GOOGLE_APPLICATION_CREDENTIALS"
+    "TECHNICIAN_SHEET_NAME",
+    "GOOGLE_APPLICATION_CREDENTIALS" // dibaca otomatis oleh library Google
 ];
 
-// Baca dan cek isi .env, berhenti dengan pesan jelas kalau ada yang kosong atau salah format
+// Baca dan cek isi .env
 export function loadConfig(env = process.env) {
     const missingKeys = REQUIRED_ENV_KEYS.filter((key) => !env[key]?.trim());
 
@@ -23,6 +23,7 @@ export function loadConfig(env = process.env) {
         allowedGroupIds: (env.ALLOWED_GROUP_IDS ?? "").split(",").map((groupId) => groupId.trim()).filter(Boolean),
         spreadsheetId: env.RED_TAG_SPREADSHEET_ID.trim(),
         sheetName: env.RED_TAG_SHEET_NAME.trim(),
+        technicianSheetName: env.TECHNICIAN_SHEET_NAME.trim(),
         whatsAppPhoneNumber
     };
 }
