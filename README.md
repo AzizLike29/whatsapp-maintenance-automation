@@ -9,9 +9,10 @@ Receive WhatsApp Message      (whatsAppClient.js)
   → Normalize Message          (normalizeMessage.js)
   → Validate Source Group      (processMessage.js)
   → Require Bot Mention + No Tag
-  → Find Red Tag Row           (googleSheetsRepository.js)
-  → Close or Reopen the Row    (googleSheetsRepository.js)
-  → Send WhatsApp Reply
+  → Check Sender Is a Technician (Data Teknisi tab)
+  → Split Message per No Tag   (extractField.js)
+  → Close or Reopen Each Row   (googleSheetsRepository.js)
+  → Send One Summary Reply     (acknowledgementMessages.js)
 ```
 
 - Messages from groups not listed in `ALLOWED_GROUP_IDS` are ignored.
@@ -38,6 +39,20 @@ Reopen a tag:
 No Tag: 24308
 Status: Open
 ```
+
+Several tags in one message (mention the bot once, list numbers are optional, each `No Tag:` line starts a new block):
+
+```text
+@Bot
+1. No Tag: 24308
+Penanggulangan: Ganti belt
+PIC: Alim
+
+2. No Tag: 24311
+Status: Open
+```
+
+The bot replies once with a summary of every tag, including the close date and time (WIB). A failed tag does not stop the others.
 
 `No Tag` accepts the full tag (`RT/LINEB/07/2026/24308`) or only its trailing number (`24308`, leading zeros optional). Trailing numbers repeat across years, so a close only matches tags that are still Open and a reopen only matches tags that are Closed. When more than one tag still matches, nothing is changed and the bot asks for the full tag.
 
