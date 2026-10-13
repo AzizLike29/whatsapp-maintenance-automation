@@ -2,31 +2,31 @@ import makeWASocket, { DisconnectReason, jidNormalizedUser, useMultiFileAuthStat
 import qrcode from "qrcode-terminal";
 import { logger } from "./logger.js";
 
-// Berisi rahasia sesi WhatsApp, jangan pernah di-commit
+// Berisi rahasia sesi WhatsApp
 const AUTH_STATE_DIR = "auth_info";
 
-// Matikan log bawaan Baileys yang terlalu ramai, aplikasi mencatat log sendiri
+// Matikan log bawaan Baileys
 const silentBaileysLogger = {
     level: "silent",
     child: () => silentBaileysLogger,
-    trace: () => {},
-    debug: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {}
+    trace: () => { },
+    debug: () => { },
+    info: () => { },
+    warn: () => { },
+    error: () => { }
 };
 
-// Hubungkan bot ke WhatsApp dan teruskan setiap pesan masuk ke onMessage
+// Jalankan bot WhatsApp
 export async function startWhatsAppClient({ phoneNumber, onMessage }) {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_STATE_DIR);
     let socket;
 
-    // Balas di grup dengan mengutip pesan teknisi
+    // Balas sambil quote pesan
     async function sendReply(message, text) {
         await socket.sendMessage(message.groupId, { text }, { quoted: message.rawMessage });
     }
 
-    // Minta kode pairing untuk menautkan WhatsApp tanpa scan QR
+    // Minta kode pairing
     async function requestPairingCode() {
         try {
             const pairingCode = await socket.requestPairingCode(phoneNumber);
@@ -38,16 +38,16 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
         }
     }
 
-    // Tampilkan QR code di terminal untuk ditautkan dari HP bot
+    // Tampilkan QR di terminal
     function showQrCode(qr) {
         logger.info("Scan this QR code with WhatsApp > Linked devices > Link a device:");
         qrcode.generate(qr, { small: true });
     }
 
-    // Buat koneksi baru, dipanggil ulang otomatis setiap koneksi terputus
+    // Buat koneksi, diulang saat terputus
     function connect() {
         socket = makeWASocket({ auth: state, logger: silentBaileysLogger });
-        // Event "qr" muncul ulang tiap ~20 detik, kode pairing cukup diminta sekali supaya kode sebelumnya tidak hangus
+        // Kode pairing cukup diminta sekali
         let isPairingCodeRequested = false;
 
         socket.ev.on("creds.update", saveCreds);
@@ -78,18 +78,18 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
                 return;
             }
 
-            // Termasuk penutupan "restart required" yang selalu terjadi setelah scan QR pertama
+            // Termasuk restart setelah scan QR pertama
             logger.warn(`WhatsApp connection closed (statusCode=${statusCode}), reconnecting`);
             connect();
         });
 
         socket.ev.on("messages.upsert", async ({ messages, type }) => {
-            // "append" adalah riwayat chat saat tersambung, yang diproses hanya pesan baru
+            // Hanya proses pesan baru
             if (type !== "notify") {
                 return;
             }
 
-            // Mention di grup bisa memakai ID nomor HP atau LID, keduanya dianggap ID bot
+            // ID bot: nomor HP dan LID
             const botJids = [socket.user?.id, socket.user?.lid].filter(Boolean).map(jidNormalizedUser);
             for (const rawMessage of messages) {
                 await onMessage(rawMessage, { sendReply, botJids });

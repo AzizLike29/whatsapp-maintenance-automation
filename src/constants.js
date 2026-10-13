@@ -1,7 +1,7 @@
-// Zona waktu pabrik, dipakai untuk tanggal close
+// Zona waktu pabrik
 export const ASIA_JAKARTA = "Asia/Jakarta";
 
-// Hasil akhir pemrosesan satu pesan, dipakai di log dan test
+// Status hasil proses pesan
 export const PROCESSING_STATUS = {
     IGNORED: "IGNORED",
     INVALID: "INVALID",
@@ -9,12 +9,12 @@ export const PROCESSING_STATUS = {
     ERROR: "ERROR"
 };
 
-// Label yang diketik teknisi saat close Red Tag, semuanya wajib diisi
+// Label wajib saat close
 export const RED_TAG_LABEL = {
     TAG_NUMBER: "No Tag",
     SOLUTION: "Penanggulangan",
     SOLVED_BY: "PIC"
 };
 
-// Dipisah dari RED_TAG_LABEL supaya tidak ikut jadi field wajib saat close
+// Label reopen, bukan field wajib
 export const RED_TAG_STATUS_LABEL = "Status";

@@ -1,4 +1,4 @@
-// Cetak satu baris log dengan level dan waktu, error dikirim ke stderr
+// Cetak log, error ke stderr
 function write(level, message) {
     const line = `[${level}] ${new Date().toISOString()} ${message}`;
 
@@ -10,7 +10,7 @@ function write(level, message) {
     console.log(line);
 }
 
-// Logger sederhana yang dipakai di seluruh aplikasi
+// Logger aplikasi
 export const logger = {
     info: (message) => write("INFO", message),
     warn: (message) => write("WARN", message),

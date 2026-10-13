@@ -5,7 +5,7 @@ import { normalizeMessage } from "./normalizeMessage.js";
 import { processMessage } from "./processMessage.js";
 import { startWhatsAppClient } from "./whatsAppClient.js";
 
-// Titik awal aplikasi: baca konfigurasi, siapkan akses Sheets, lalu jalankan bot WhatsApp
+// Titik awal aplikasi
 async function main() {
     const config = loadConfig();
     const redTagRepository = createRedTagRepository(config);
