@@ -1,11 +1,12 @@
 import { auth, sheets } from "@googleapis/sheets";
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-
-// Samakan format No Tag supaya beda huruf besar kecil dan spasi tidak berpengaruh
+// Rapikan No Tag
 const normalizeTag = (tag) => tag?.trim().toLowerCase() ?? "";
+// Rapikan No WA ke format 62
+export const normalizePhone = (phone) => String(phone ?? "").replace(/\D/g, "").replace(/^0/, "62");
 
-// Angka saja dicocokkan ke nomor belakang tag ("8530" sama dengan ".../08530"), selain itu harus sama persis
+// Cocokkan No Tag lengkap atau nomor belakang
 export function isSameTag(storedTag, tagInput) {
     const stored = normalizeTag(storedTag);
     const input = normalizeTag(tagInput);
@@ -18,26 +19,24 @@ export function isSameTag(storedTag, tagInput) {
     return stored === input;
 }
 
-// Akses sheet Red Tag: cari tag, close, dan buka kembali
-export function createRedTagRepository({ spreadsheetId, sheetName }) {
+// Akses sheet Red Tag dan teknisi
+export function createRedTagRepository({ spreadsheetId, sheetName, technicianSheetName }) {
     const sheetsClient = sheets({ version: "v4", auth: new auth.GoogleAuth({ scopes: [SHEETS_SCOPE] }) });
 
-    // Nama sheet diberi tanda kutip supaya nama yang ada spasinya tetap valid
+    // Diberi kutip karena nama sheet ada spasi
     const sheetRange = (cells) => `'${sheetName}'!${cells}`;
 
-    // Cari semua baris yang No Tag-nya cocok, kolom B = No Tag dan kolom N = Tgl Close (index 12 dalam B:N)
-    async function findRedTags(tagInput) {
+    // Ambil semua tag sekali baca, kolom B No Tag, N Tgl Close
+    async function listRedTags() {
         const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId, range: sheetRange("B:N") });
         const rows = response.data.values ?? [];
 
         return rows.flatMap((row, index) =>
-            row[0] && isSameTag(row[0], tagInput)
-                ? [{ rowNumber: index + 1, tagNumber: row[0].trim(), closedAt: row[12] ?? "" }]
-                : []
+            row[0] ? [{ rowNumber: index + 1, tagNumber: row[0].trim(), closedAt: row[12] ?? "" }] : []
         );
     }
 
-    // Isi PIC, Tgl Close, dan Penanggulangan, kolom O (Status) tidak ditulis karena berisi rumus
+    // Isi M, N, P, kolom O rumus jangan ditulis
     async function closeRedTag({ rowNumber, solvedBy, closedDate, solution }) {
         await sheetsClient.spreadsheets.values.batchUpdate({
             spreadsheetId,
@@ -51,7 +50,7 @@ export function createRedTagRepository({ spreadsheetId, sheetName }) {
         });
     }
 
-    // Kosongkan PIC, Tgl Close, dan Penanggulangan, Status otomatis kembali Open
+    // Kosongkan M, N, P
     async function reopenRedTag(rowNumber) {
         await sheetsClient.spreadsheets.values.batchClear({
             spreadsheetId,
@@ -59,5 +58,12 @@ export function createRedTagRepository({ spreadsheetId, sheetName }) {
         });
     }
 
-    return { findRedTags, closeRedTag, reopenRedTag };
+    // Cek No WA di kolom E tab teknisi
+    async function isTechnician(phone) {
+        const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId, range: `'${technicianSheetName}'!E:E` });
+        const rows = response.data.values ?? [];
+        return rows.some((row) => normalizePhone(row[0]) === normalizePhone(phone));
+    }
+
+    return { findRedTags, closeRedTag, reopenRedTag, isTechnician };
 }
