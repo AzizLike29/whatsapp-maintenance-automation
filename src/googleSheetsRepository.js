@@ -65,5 +65,5 @@ export function createRedTagRepository({ spreadsheetId, sheetName, technicianShe
         return rows.some((row) => normalizePhone(row[0]) === normalizePhone(phone));
     }
 
-    return { findRedTags, closeRedTag, reopenRedTag, isTechnician };
+    return { listRedTags, closeRedTag, reopenRedTag, isTechnician };
 }
