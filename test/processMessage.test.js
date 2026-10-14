@@ -37,7 +37,7 @@ function createDependencies({ redTags = [], failOnWrite = false } = {}) {
     // Catat data atau tiru Sheets gagal
     const write = (target, value) => {
         if (failOnWrite) {
-            throw new Error("Sheets unavailable");
+            throw new Error("Sheets tidak bisa diakses");
         }
         target.push(value);
     };
@@ -58,8 +58,7 @@ function createDependencies({ redTags = [], failOnWrite = false } = {}) {
     };
 }
 
-// Close tag Open
-test("closes an open tag and replies with the full tag number", async () => {
+test("close tag yang masih Open dan balas dengan No Tag lengkap", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const status = await processMessage(createMessage(), dependencies);
 
@@ -70,18 +69,16 @@ test("closes an open tag and replies with the full tag number", async () => {
     assert.deepEqual(dependencies.replies, [summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim")]);
 });
 
-// Reopen tag Close
-test("reopens a closed tag when Status is Open", async () => {
+test("buka kembali tag yang sudah Close lewat Status Open", async () => {
     const dependencies = createDependencies({ redTags: [CLOSED_TAG] });
     const status = await processMessage(createMessage({ messageText: REOPEN_TEXT }), dependencies);
 
     assert.equal(status, "PROCESSED");
     assert.deepEqual(dependencies.reopenedRows, [5789]);
-    assert.deepEqual(dependencies.replies, [summary("✓ RT/LINEB/07/2026/24308\n  Open kembali")]);
+    assert.deepEqual(dependencies.replies, [summary("✓ RT/LINEB/07/2026/24308\n  Dibuka kembali, status jadi Open")]);
 });
 
-// Banyak tag dalam satu pesan, satu balasan ringkasan
-test("processes several numbered tags in one message", async () => {
+test("proses banyak tag bernomor dalam satu pesan", async () => {
     const otherOpenTag = { rowNumber: 5790, tagNumber: "RT/LINEB/07/2026/24311", closedAt: "" };
     const otherClosedTag = { rowNumber: 5791, tagNumber: "RT/LINEB/07/2026/24315", closedAt: "12/10/2026" };
     const dependencies = createDependencies({ redTags: [OPEN_TAG, otherOpenTag, otherClosedTag] });
@@ -108,13 +105,12 @@ test("processes several numbered tags in one message", async () => {
         summary(
             "✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim",
             "✓ RT/LINEB/07/2026/24311\n  Close · Ganti bearing · Joko",
-            "✗ 24315\n  Sudah Close"
+            "✗ 24315\n  Tag ini sudah Close sebelumnya"
         )
     ]);
 });
 
-// Tag sama dua kali hanya di-close sekali
-test("does not close the same tag twice in one message", async () => {
+test("tag yang sama dua kali dalam satu pesan hanya di-close sekali", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const messageText = `${CLOSE_TEXT}\n${CLOSE_TEXT.replace("@bot\n", "")}`;
 
@@ -122,22 +118,20 @@ test("does not close the same tag twice in one message", async () => {
 
     assert.equal(dependencies.closedTags.length, 1);
     assert.deepEqual(dependencies.replies, [
-        summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim", "✗ 24308\n  Sudah Close")
+        summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim", "✗ 24308\n  Tag ini sudah Close sebelumnya")
     ]);
 });
 
-// Tag Close tidak ditulis ulang
-test("does not close a tag that is already closed", async () => {
+test("tag yang sudah Close tidak ditulis ulang", async () => {
     const dependencies = createDependencies({ redTags: [CLOSED_TAG] });
     const status = await processMessage(createMessage(), dependencies);
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Sudah Close")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Tag ini sudah Close sebelumnya")]);
 });
 
-// Nomor ganda minta No Tag lengkap
-test("asks for the full tag number when several open tags share the number", async () => {
+test("minta No Tag lengkap kalau nomor belakang cocok dengan beberapa tag Open", async () => {
     const otherOpenTag = { rowNumber: 100, tagNumber: "RT/LINEA/01/2025/24308", closedAt: "" };
     const dependencies = createDependencies({ redTags: [OPEN_TAG, otherOpenTag] });
 
@@ -145,30 +139,27 @@ test("asks for the full tag number when several open tags share the number", asy
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Cocok lebih dari satu tag, ketik No Tag lengkap")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Ada beberapa tag dengan nomor ini, tulis No Tag lengkap ya")]);
 });
 
-// Tag tidak ditemukan
-test("replies when the tag does not exist", async () => {
+test("balas tag tidak ditemukan", async () => {
     const dependencies = createDependencies();
     const status = await processMessage(createMessage(), dependencies);
 
     assert.equal(status, "INVALID");
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Tidak ditemukan, cek lagi penulisannya")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Tag tidak ditemukan, coba cek lagi nomornya")]);
 });
 
-// Balas field yang kosong
-test("replies with the missing fields when closing", async () => {
+test("sebutkan field yang belum diisi saat close", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const status = await processMessage(createMessage({ messageText: "@bot\nNo Tag: 24308\nOleh: Alim" }), dependencies);
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Belum lengkap: Penanggulangan, PIC")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Belum lengkap, tolong tambahkan Penanggulangan dan PIC")]);
 });
 
-// Tanpa mention bot diabaikan
-test("ignores Red Tag messages that do not mention the bot", async () => {
+test("abaikan pesan Red Tag yang tidak mention bot", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const status = await processMessage(createMessage({ mentionedJids: [] }), dependencies);
 
@@ -176,8 +167,7 @@ test("ignores Red Tag messages that do not mention the bot", async () => {
     assert.equal(dependencies.replies.length, 0);
 });
 
-// Chat biasa diabaikan
-test("ignores regular chat messages without replying", async () => {
+test("abaikan chat biasa kalau fitur AI tidak aktif", async () => {
     const dependencies = createDependencies();
     const status = await processMessage(createMessage({ messageText: "@bot siap, terima kasih" }), dependencies);
 
@@ -185,8 +175,7 @@ test("ignores regular chat messages without replying", async () => {
     assert.equal(dependencies.replies.length, 0);
 });
 
-// Grup lain diabaikan
-test("ignores messages from groups that are not allowed", async () => {
+test("abaikan pesan dari grup yang belum diizinkan", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const status = await processMessage(createMessage({ groupId: "other@g.us" }), dependencies);
 
@@ -194,22 +183,37 @@ test("ignores messages from groups that are not allowed", async () => {
     assert.equal(dependencies.closedTags.length, 0);
 });
 
-// Sheets gagal, balasan menyebut gagal disimpan
-test("returns ERROR and reports the failure when writing to Sheets fails", async () => {
+test("laporkan gagal simpan kalau Google Sheets error", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG], failOnWrite: true });
     const status = await processMessage(createMessage(), dependencies);
 
     assert.equal(status, "ERROR");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, [summary("✗ RT/LINEB/07/2026/24308\n  Gagal disimpan, coba lagi")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ RT/LINEB/07/2026/24308\n  Gagal menyimpan ke spreadsheet, coba kirim ulang")]);
 });
 
-// Bukan teknisi ditolak
-test("rejects senders who are not registered technicians", async () => {
+test("tolak pengirim yang bukan teknisi terdaftar", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const status = await processMessage(createMessage({ senderPhone: "6289999999999" }), dependencies);
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, ["Nomor Anda belum terdaftar sebagai teknisi, hubungi admin."]);
+    assert.deepEqual(dependencies.replies, ["Maaf, nomor Anda belum terdaftar sebagai teknisi, silakan hubungi admin Aziz ya"]);
+});
+
+test("jawab pertanyaan tanpa No Tag dengan AI", async () => {
+    const dependencies = { ...createDependencies(), aiAssistant: { ask: async (question) => `Jawaban: ${question}` } };
+    const status = await processMessage(createMessage({ messageText: "@6281111111111 berapa tag open?" }), dependencies);
+
+    assert.equal(status, "PROCESSED");
+    assert.deepEqual(dependencies.replies, ["Jawaban: berapa tag open?"]);
+});
+
+test("balas AI tidak tersedia kalau AI gagal", async () => {
+    const failingAssistant = { ask: async () => { throw new Error("Kuota habis"); } };
+    const dependencies = { ...createDependencies(), aiAssistant: failingAssistant };
+    const status = await processMessage(createMessage({ messageText: "@6281111111111 berapa tag open?" }), dependencies);
+
+    assert.equal(status, "ERROR");
+    assert.deepEqual(dependencies.replies, ["Maaf, AI sedang tidak bisa menjawab, coba beberapa saat lagi ya"]);
 });
