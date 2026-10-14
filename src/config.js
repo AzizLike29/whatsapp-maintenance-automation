@@ -25,7 +25,7 @@ export function loadConfig(env = process.env) {
         sheetName: env.RED_TAG_SHEET_NAME.trim(),
         technicianSheetName: env.TECHNICIAN_SHEET_NAME.trim(),
         geminiApiKey: env.GEMINI_API_KEY?.trim() || null,
-        geminiModel: env.GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+        geminiModel: env.GEMINI_MODEL?.trim() || "gemini-flash-lite-latest",
         whatsAppPhoneNumber
     };
 }
