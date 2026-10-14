@@ -2,12 +2,12 @@ import { ASIA_JAKARTA, PROCESSING_STATUS } from "./constants.js";
 
 // Keterangan hasil per tag
 export const RED_TAG_RESULT = {
-    REOPENED: "Open kembali",
-    NOT_FOUND: "Tidak ditemukan, cek lagi penulisannya",
-    ALREADY_CLOSED: "Sudah Close",
-    ALREADY_OPEN: "Masih Open",
-    DUPLICATE: "Cocok lebih dari satu tag, ketik No Tag lengkap",
-    FAILED: "Gagal disimpan, coba lagi"
+    REOPENED: "Dibuka kembali, status jadi Open",
+    NOT_FOUND: "Tag tidak ditemukan, coba cek lagi nomornya",
+    ALREADY_CLOSED: "Tag ini sudah Close sebelumnya",
+    ALREADY_OPEN: "Tag ini masih Open, jadi tidak perlu dibuka lagi",
+    DUPLICATE: "Ada beberapa tag dengan nomor ini, tulis No Tag lengkap ya",
+    FAILED: "Gagal menyimpan ke spreadsheet, coba kirim ulang"
 };
 
 export function buildClosedResult(solution, solvedBy) {
@@ -15,7 +15,7 @@ export function buildClosedResult(solution, solvedBy) {
 }
 
 export function buildMissingFieldsResult(labels) {
-    return `Belum lengkap: ${labels.join(", ")}`;
+    return `Belum lengkap, tolong tambahkan ${labels.join(" dan ")}`;
 }
 
 // Tanggal Indonesia, contoh Selasa, 13 Okt 2026
@@ -43,5 +43,9 @@ export function buildRedTagSummaryMessage(results, receivedAt) {
 }
 
 export function buildNotTechnicianMessage() {
-    return "Nomor Anda belum terdaftar sebagai teknisi, hubungi admin.";
+    return "Maaf, nomor Anda belum terdaftar sebagai teknisi, silakan hubungi admin Aziz ya";
+}
+
+export function buildAiUnavailableMessage() {
+    return "Maaf, AI sedang tidak bisa menjawab, coba beberapa saat lagi ya";
 }
