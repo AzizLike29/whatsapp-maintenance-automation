@@ -1,12 +1,12 @@
 // Nilai yang dianggap kosong
 const EMPTY_VALUES = ["", "-"];
 
-// Rapikan label, nomor urut "1." di depan diabaikan
+// Rapikan label, nomor urut di depan diabaikan
 function normalizeLabel(label) {
     return label.toLowerCase().replace(/^\s*\d+[.)]/, "").replace(/[\s*_]/g, "");
 }
 
-// Label di baris "Label: isi", null kalau tidak ada ":"
+// Ambil label sebelum titik dua, null kalau tidak ada titik dua
 function labelOf(line) {
     const separatorIndex = line.indexOf(":");
     return separatorIndex === -1 ? null : normalizeLabel(line.slice(0, separatorIndex));
