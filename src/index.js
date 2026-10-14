@@ -1,3 +1,4 @@
+import { createAiAssistant } from "./aiAssistant.js";
 import { loadConfig } from "./config.js";
 import { createRedTagRepository } from "./googleSheetsRepository.js";
 import { logger } from "./logger.js";
@@ -9,9 +10,10 @@ import { startWhatsAppClient } from "./whatsAppClient.js";
 async function main() {
     const config = loadConfig();
     const redTagRepository = createRedTagRepository(config);
+    const aiAssistant = config.geminiApiKey ? createAiAssistant({ apiKey: config.geminiApiKey, model: config.geminiModel, redTagRepository }) : null;
 
     if (config.allowedGroupIds.length === 0) {
-        logger.warn("ALLOWED_GROUP_IDS is empty: all messages will be ignored. Copy the groupId from the logs into .env.");
+        logger.warn("ALLOWED_GROUP_IDS masih kosong, semua pesan akan diabaikan, salin groupId dari log ke .env");
     }
 
     await startWhatsAppClient({
@@ -26,6 +28,7 @@ async function main() {
             await processMessage(message, {
                 allowedGroupIds: config.allowedGroupIds,
                 redTagRepository,
+                aiAssistant,
                 botJids,
                 sendReply
             });
@@ -34,6 +37,6 @@ async function main() {
 }
 
 main().catch((error) => {
-    logger.error(`Failed to start application: ${error.message}`);
+    logger.error(`Aplikasi gagal dijalankan: ${error.message}`);
     process.exit(1);
 });
