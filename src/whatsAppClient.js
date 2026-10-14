@@ -31,16 +31,16 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
         try {
             const pairingCode = await socket.requestPairingCode(phoneNumber);
             logger.info(
-                `Pairing code: ${pairingCode}. Enter it in WhatsApp > Linked devices > Link a device > Link with phone number instead.`
+                `Kode pairing: ${pairingCode}, masukkan di WhatsApp > Perangkat tertaut > Tautkan perangkat > Tautkan dengan nomor telepon`
             );
         } catch (error) {
-            logger.error(`Failed to request WhatsApp pairing code for phoneNumber=${phoneNumber}: ${error.message}`);
+            logger.error(`Gagal meminta kode pairing WhatsApp untuk phoneNumber=${phoneNumber}: ${error.message}`);
         }
     }
 
     // Tampilkan QR di terminal
     function showQrCode(qr) {
-        logger.info("Scan this QR code with WhatsApp > Linked devices > Link a device:");
+        logger.info("Scan QR ini di WhatsApp > Perangkat tertaut > Tautkan perangkat");
         qrcode.generate(qr, { small: true });
     }
 
@@ -63,7 +63,7 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
             }
 
             if (connection === "open") {
-                logger.info("WhatsApp connection opened");
+                logger.info("WhatsApp tersambung");
                 return;
             }
 
@@ -74,12 +74,12 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
 
             if (statusCode === DisconnectReason.loggedOut) {
-                logger.error(`WhatsApp session logged out. Delete the "${AUTH_STATE_DIR}" folder and restart to link again.`);
+                logger.error(`Sesi WhatsApp sudah keluar, hapus folder ${AUTH_STATE_DIR} lalu jalankan ulang untuk menautkan lagi`);
                 return;
             }
 
             // Termasuk restart setelah scan QR pertama
-            logger.warn(`WhatsApp connection closed (statusCode=${statusCode}), reconnecting`);
+            logger.warn(`Koneksi WhatsApp terputus (statusCode=${statusCode}), menyambung ulang`);
             connect();
         });
 
