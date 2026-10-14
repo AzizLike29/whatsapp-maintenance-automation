@@ -58,6 +58,30 @@ export function createRedTagRepository({ spreadsheetId, sheetName, technicianShe
         });
     }
 
+    // Ambil detail semua tag untuk AI, baris 1 judul dilewati
+    async function listRedTagDetails() {
+        const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId, range: sheetRange("B2:S") });
+        const rows = response.data.values ?? [];
+
+        return rows.filter((row) => row[0]).map((row) => ({
+            noTag: row[0],
+            tahun: row[1],
+            tglRedTag: row[2],
+            equipment: row[4],
+            ditemukanOleh: row[5],
+            kategori: row[7],
+            deskripsi: row[8],
+            line: row[9],
+            pic: row[10],
+            diselesaikanOleh: row[11],
+            tglClose: row[12],
+            status: row[13],
+            penanggulangan: row[14],
+            bulan: row[16],
+            bulanClose: row[17]
+        }));
+    }
+
     // Cek No WA di kolom E tab teknisi
     async function isTechnician(phone) {
         const response = await sheetsClient.spreadsheets.values.get({ spreadsheetId, range: `'${technicianSheetName}'!E:E` });
@@ -65,5 +89,5 @@ export function createRedTagRepository({ spreadsheetId, sheetName, technicianShe
         return rows.some((row) => normalizePhone(row[0]) === normalizePhone(phone));
     }
 
-    return { listRedTags, closeRedTag, reopenRedTag, isTechnician };
+    return { listRedTags, listRedTagDetails, closeRedTag, reopenRedTag, isTechnician };
 }
