@@ -25,6 +25,9 @@ test("nomor urut di depan label diabaikan", () => {
 test("pesan dipecah per blok No Tag dan baris sebelumnya dibuang", () => {
     const messageText = "@bot\n1. No Tag: 1\nPIC: Alim\n2. No Tag: 2\nPIC: Joko";
 
-    assert.deepEqual(splitByField(messageText, "No Tag"), ["1. No Tag: 1\nPIC: Alim", "2. No Tag: 2\nPIC: Joko"]);
-    assert.deepEqual(splitByField("@bot siap", "No Tag"), []);
+    assert.deepEqual(splitByField(messageText, ["No Tag"]), [
+        { label: "No Tag", text: "1. No Tag: 1\nPIC: Alim" },
+        { label: "No Tag", text: "2. No Tag: 2\nPIC: Joko" }
+    ]);
+    assert.deepEqual(splitByField("@bot siap", ["No Tag"]), []);
 });
