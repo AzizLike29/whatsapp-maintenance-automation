@@ -1,4 +1,4 @@
-// Cetak log, error ke stderr
+// Cetak log
 function write(level, message) {
     const line = `[${level}] ${new Date().toISOString()} ${message}`;
 
