@@ -1,8 +1,11 @@
 import { buildAiUnavailableMessage, buildClosedResult, buildMissingFieldsResult, buildNotTechnicianMessage, buildRedTagSummaryMessage, RED_TAG_RESULT } from "./acknowledgementMessages.js";
-import { PROCESSING_STATUS, RED_TAG_LABEL, RED_TAG_STATUS_LABEL } from "./constants.js";
+import { PROCESSING_STATUS, SHEET_TYPES, STATUS_LABEL } from "./constants.js";
 import { extractField, splitByField } from "./extractField.js";
 import { isSameTag } from "./googleSheetsRepository.js";
 import { logger } from "./logger.js";
+
+// Jenis sheet berdasarkan label nomor
+const TYPE_BY_LABEL = Object.fromEntries(Object.entries(SHEET_TYPES).map(([type, { labels }]) => [labels.TAG_NUMBER, type]));
 
 // Cari satu tag sesuai status, kalau gagal kembalikan alasannya
 function findRedTagToUpdate(redTags, tagInput, wantClosed) {
@@ -24,19 +27,20 @@ function findRedTagToUpdate(redTags, tagInput, wantClosed) {
     return { redTag: candidates[0] };
 }
 
-// Close atau reopen satu blok, closedAt ikut diubah supaya tag sama di blok berikutnya terbaca benar
-async function processBlock(block, redTags, { message, redTagRepository }) {
-    const isReopen = extractField(block, RED_TAG_STATUS_LABEL)?.toLowerCase() === "open";
-    const labels = isReopen ? [RED_TAG_LABEL.TAG_NUMBER] : Object.values(RED_TAG_LABEL);
-    const fields = Object.fromEntries(labels.map((label) => [label, extractField(block, label)]));
-    const tagInput = fields[RED_TAG_LABEL.TAG_NUMBER];
+// Close atau reopen satu blok, closedAt ikut diubah supaya nomor sama di blok berikutnya terbaca benar
+async function processBlock({ type, text }, tags, { message, redTagRepository }) {
+    const { name, labels: sheetLabels } = SHEET_TYPES[type];
+    const isReopen = extractField(text, STATUS_LABEL)?.toLowerCase() === "open";
+    const labels = isReopen ? [sheetLabels.TAG_NUMBER] : Object.values(sheetLabels);
+    const fields = Object.fromEntries(labels.map((label) => [label, extractField(text, label)]));
+    const tagInput = fields[sheetLabels.TAG_NUMBER];
     const missingLabels = labels.filter((label) => !fields[label]);
 
     if (missingLabels.length > 0) {
         return { status: PROCESSING_STATUS.INVALID, tag: tagInput ?? "-", detail: buildMissingFieldsResult(missingLabels) };
     }
 
-    const { redTag, reason } = findRedTagToUpdate(redTags, tagInput, isReopen);
+    const { redTag, reason } = findRedTagToUpdate(tags, tagInput, isReopen);
 
     if (!redTag) {
         return { status: PROCESSING_STATUS.INVALID, tag: tagInput, detail: reason };
@@ -44,22 +48,22 @@ async function processBlock(block, redTags, { message, redTagRepository }) {
 
     try {
         if (isReopen) {
-            await redTagRepository.reopenRedTag(redTag.rowNumber);
+            await redTagRepository.reopenTag(type, redTag.rowNumber);
             redTag.closedAt = "";
-            logger.info(`Red Tag ${redTag.tagNumber} dibuka kembali di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
+            logger.info(`${name} ${redTag.tagNumber} dibuka kembali di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
             return { status: PROCESSING_STATUS.PROCESSED, tag: redTag.tagNumber, detail: RED_TAG_RESULT.REOPENED };
         }
 
         const closedDate = message.receivedAt.slice(0, 10);
-        const solution = fields[RED_TAG_LABEL.SOLUTION];
-        const solvedBy = fields[RED_TAG_LABEL.SOLVED_BY];
+        const solution = fields[sheetLabels.SOLUTION];
+        const solvedBy = fields[sheetLabels.SOLVED_BY];
 
-        await redTagRepository.closeRedTag({ rowNumber: redTag.rowNumber, solvedBy, solution, closedDate });
+        await redTagRepository.closeTag(type, { rowNumber: redTag.rowNumber, solvedBy, solution, closedDate });
         redTag.closedAt = closedDate;
-        logger.info(`Red Tag ${redTag.tagNumber} di-close di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
+        logger.info(`${name} ${redTag.tagNumber} di-close di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
         return { status: PROCESSING_STATUS.PROCESSED, tag: redTag.tagNumber, detail: buildClosedResult(solution, solvedBy) };
     } catch (error) {
-        logger.error(`Gagal menyimpan Red Tag ${redTag.tagNumber}, messageId=${message.messageId}: ${error.message}`);
+        logger.error(`Gagal menyimpan ${name} ${redTag.tagNumber}, messageId=${message.messageId}: ${error.message}`);
         return { status: PROCESSING_STATUS.ERROR, tag: redTag.tagNumber, detail: RED_TAG_RESULT.FAILED };
     }
 }
@@ -88,7 +92,7 @@ export async function processMessage(message, { allowedGroupIds, redTagRepositor
         return PROCESSING_STATUS.IGNORED;
     }
 
-    const blocks = splitByField(messageText, RED_TAG_LABEL.TAG_NUMBER);
+    const blocks = splitByField(messageText, Object.keys(TYPE_BY_LABEL)).map(({ label, text }) => ({ type: TYPE_BY_LABEL[label], text }));
     const mentionsBot = message.mentionedJids.some((jid) => botJids.includes(jid));
 
     const isQuestion = blocks.length === 0;
@@ -110,11 +114,13 @@ export async function processMessage(message, { allowedGroupIds, redTagRepositor
             return await answerQuestion(message, { aiAssistant, sendReply });
         }
 
-        const redTags = await redTagRepository.listRedTags();
+        const tagsByType = {};
         const results = [];
 
+        // Tiap sheet dibaca sekali
         for (const block of blocks) {
-            results.push(await processBlock(block, redTags, { message, redTagRepository }));
+            tagsByType[block.type] ??= await redTagRepository.listTags(block.type);
+            results.push(await processBlock(block, tagsByType[block.type], { message, redTagRepository }));
         }
 
         await sendReply(message, buildRedTagSummaryMessage(results, message.receivedAt));
