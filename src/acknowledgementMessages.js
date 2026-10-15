@@ -3,10 +3,10 @@ import { ASIA_JAKARTA, PROCESSING_STATUS } from "./constants.js";
 // Keterangan hasil per tag
 export const RED_TAG_RESULT = {
     REOPENED: "Dibuka kembali, status jadi Open",
-    NOT_FOUND: "Tag tidak ditemukan, coba cek lagi nomornya",
-    ALREADY_CLOSED: "Tag ini sudah Close sebelumnya",
-    ALREADY_OPEN: "Tag ini masih Open, jadi tidak perlu dibuka lagi",
-    DUPLICATE: "Ada beberapa tag dengan nomor ini, tulis No Tag lengkap ya",
+    NOT_FOUND: "Nomor tidak ditemukan, coba cek lagi",
+    ALREADY_CLOSED: "Sudah Close sebelumnya",
+    ALREADY_OPEN: "Masih Open, jadi tidak perlu dibuka lagi",
+    DUPLICATE: "Ada beberapa data dengan nomor ini, tulis nomor lengkap ya",
     FAILED: "Gagal menyimpan ke spreadsheet, coba kirim ulang"
 };
 
@@ -18,7 +18,7 @@ export function buildMissingFieldsResult(labels) {
     return `Belum lengkap, tolong tambahkan ${labels.join(" dan ")}`;
 }
 
-// Tanggal Indonesia, contoh Selasa, 13 Okt 2026
+// Tanggal Waktu Indonesia
 function formatDate(receivedAt) {
     return new Date(receivedAt).toLocaleDateString("id-ID", {
         timeZone: ASIA_JAKARTA,
@@ -43,9 +43,9 @@ export function buildRedTagSummaryMessage(results, receivedAt) {
 }
 
 export function buildNotTechnicianMessage() {
-    return "Maaf, nomor Anda belum terdaftar sebagai teknisi, silakan hubungi admin Aziz ya";
+    return "Nomor Anda belum terdaftar sebagai teknisi. Silakan hubungi admin Aziz untuk mendapatkan bantuan ya😉";
 }
 
 export function buildAiUnavailableMessage() {
-    return "Maaf, AI sedang tidak bisa menjawab, coba beberapa saat lagi ya";
+    return "Maaf, layanan AI sedang mengalami kendala. Silakan coba kembali beberapa saat lagi ya😉";
 }
