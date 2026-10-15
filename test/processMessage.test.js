@@ -11,7 +11,7 @@ const REOPEN_TEXT = "@bot\nNo Tag: 24308\nStatus: Open";
 const OPEN_TAG = { rowNumber: 5789, tagNumber: "RT/LINEB/07/2026/24308", closedAt: "" };
 const CLOSED_TAG = { ...OPEN_TAG, closedAt: "12/10/2026" };
 
-// Balasan ringkasan yang diharapkan
+// Balasan ringkasan template whatsapp, contoh:
 const summary = (...entries) => `*UPDATE RED TAG*\n_Senin, 12 Okt 2026 · 16:00 WIB_\n\`\`\`${entries.join("\n\n")}\`\`\``;
 
 // Pesan palsu, default close valid
@@ -29,7 +29,8 @@ function createMessage(overrides = {}) {
 }
 
 // Repository dan sendReply palsu, tag disalin supaya data contoh tidak ikut berubah
-function createDependencies({ redTags = [], failOnWrite = false } = {}) {
+function createDependencies({ redTags = [], tags = {}, failOnWrite = false } = {}) {
+    const tagsByType = { redTag: redTags, ...tags };
     const closedTags = [];
     const reopenedRows = [];
     const replies = [];
@@ -49,9 +50,9 @@ function createDependencies({ redTags = [], failOnWrite = false } = {}) {
         allowedGroupIds: [ALLOWED_GROUP_ID],
         botJids: [BOT_JID],
         redTagRepository: {
-            listRedTags: async () => redTags.map((redTag) => ({ ...redTag })),
-            closeRedTag: async (update) => write(closedTags, update),
-            reopenRedTag: async (rowNumber) => write(reopenedRows, rowNumber),
+            listTags: async (type) => (tagsByType[type] ?? []).map((tag) => ({ ...tag })),
+            closeTag: async (type, update) => write(closedTags, { type, ...update }),
+            reopenTag: async (type, rowNumber) => write(reopenedRows, rowNumber),
             isTechnician: async (phone) => phone === TECHNICIAN_PHONE
         },
         sendReply: async (message, text) => replies.push(text)
@@ -64,7 +65,7 @@ test("close tag yang masih Open dan balas dengan No Tag lengkap", async () => {
 
     assert.equal(status, "PROCESSED");
     assert.deepEqual(dependencies.closedTags, [
-        { rowNumber: 5789, solvedBy: "Alim", solution: "Ganti belt", closedDate: "2026-10-12" }
+        { type: "redTag", rowNumber: 5789, solvedBy: "Alim", solution: "Ganti belt", closedDate: "2026-10-12" }
     ]);
     assert.deepEqual(dependencies.replies, [summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim")]);
 });
@@ -105,7 +106,7 @@ test("proses banyak tag bernomor dalam satu pesan", async () => {
         summary(
             "✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim",
             "✓ RT/LINEB/07/2026/24311\n  Close · Ganti bearing · Joko",
-            "✗ 24315\n  Tag ini sudah Close sebelumnya"
+            "✗ 24315\n  Sudah Close sebelumnya"
         )
     ]);
 });
@@ -118,7 +119,7 @@ test("tag yang sama dua kali dalam satu pesan hanya di-close sekali", async () =
 
     assert.equal(dependencies.closedTags.length, 1);
     assert.deepEqual(dependencies.replies, [
-        summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim", "✗ 24308\n  Tag ini sudah Close sebelumnya")
+        summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim", "✗ 24308\n  Sudah Close sebelumnya")
     ]);
 });
 
@@ -128,7 +129,22 @@ test("tag yang sudah Close tidak ditulis ulang", async () => {
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Tag ini sudah Close sebelumnya")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Sudah Close sebelumnya")]);
+});
+
+test("close Orange Tag dan WR dalam satu pesan sesuai label", async () => {
+    const orangeTag = { rowNumber: 2880, tagNumber: "OT/LINEC/04/2026/06755", closedAt: "" };
+    const workRequest = { rowNumber: 4929, tagNumber: "194889", closedAt: "" };
+    const dependencies = createDependencies({ tags: { orangeTag: [orangeTag], workRequest: [workRequest] } });
+    const messageText = "@bot\nNo OT: 6755\nPenanggulangan: Pengelasan plat\nPIC: Wahyu\n\nNo WR: 194889\nPenanggulangan: Pasang sensor\nExecutor: Ripal";
+
+    const status = await processMessage(createMessage({ messageText }), dependencies);
+
+    assert.equal(status, "PROCESSED");
+    assert.deepEqual(dependencies.closedTags, [
+        { type: "orangeTag", rowNumber: 2880, solvedBy: "Wahyu", solution: "Pengelasan plat", closedDate: "2026-10-12" },
+        { type: "workRequest", rowNumber: 4929, solvedBy: "Ripal", solution: "Pasang sensor", closedDate: "2026-10-12" }
+    ]);
 });
 
 test("minta No Tag lengkap kalau nomor belakang cocok dengan beberapa tag Open", async () => {
@@ -139,7 +155,7 @@ test("minta No Tag lengkap kalau nomor belakang cocok dengan beberapa tag Open",
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Ada beberapa tag dengan nomor ini, tulis No Tag lengkap ya")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Ada beberapa data dengan nomor ini, tulis nomor lengkap ya")]);
 });
 
 test("balas tag tidak ditemukan", async () => {
@@ -147,7 +163,7 @@ test("balas tag tidak ditemukan", async () => {
     const status = await processMessage(createMessage(), dependencies);
 
     assert.equal(status, "INVALID");
-    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Tag tidak ditemukan, coba cek lagi nomornya")]);
+    assert.deepEqual(dependencies.replies, [summary("✗ 24308\n  Nomor tidak ditemukan, coba cek lagi")]);
 });
 
 test("sebutkan field yang belum diisi saat close", async () => {
@@ -198,7 +214,7 @@ test("tolak pengirim yang bukan teknisi terdaftar", async () => {
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
-    assert.deepEqual(dependencies.replies, ["Maaf, nomor Anda belum terdaftar sebagai teknisi, silakan hubungi admin Aziz ya"]);
+    assert.deepEqual(dependencies.replies, ["Nomor Anda belum terdaftar sebagai teknisi. Silakan hubungi admin Aziz untuk mendapatkan bantuan ya😉"]);
 });
 
 test("jawab pertanyaan tanpa No Tag dengan AI", async () => {
@@ -215,5 +231,5 @@ test("balas AI tidak tersedia kalau AI gagal", async () => {
     const status = await processMessage(createMessage({ messageText: "@6281111111111 berapa tag open?" }), dependencies);
 
     assert.equal(status, "ERROR");
-    assert.deepEqual(dependencies.replies, ["Maaf, AI sedang tidak bisa menjawab, coba beberapa saat lagi ya"]);
+    assert.deepEqual(dependencies.replies, ["Maaf, layanan AI sedang mengalami kendala. Silakan coba kembali beberapa saat lagi ya😉"]);
 });
