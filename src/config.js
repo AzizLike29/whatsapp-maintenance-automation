@@ -1,6 +1,8 @@
 const REQUIRED_ENV_KEYS = [
-    "RED_TAG_SPREADSHEET_ID",
+    "DASHBOARD_SPREADSHEET_ID",
     "RED_TAG_SHEET_NAME",
+    "ORANGE_TAG_SHEET_NAME",
+    "WORK_REQUEST_SHEET_NAME",
     "TECHNICIAN_SHEET_NAME",
     "GOOGLE_APPLICATION_CREDENTIALS" // dibaca otomatis oleh library Google
 ];
@@ -21,8 +23,12 @@ export function loadConfig(env = process.env) {
 
     return {
         allowedGroupIds: (env.ALLOWED_GROUP_IDS ?? "").split(",").map((groupId) => groupId.trim()).filter(Boolean),
-        spreadsheetId: env.RED_TAG_SPREADSHEET_ID.trim(),
-        sheetName: env.RED_TAG_SHEET_NAME.trim(),
+        spreadsheetId: env.DASHBOARD_SPREADSHEET_ID.trim(),
+        sheetNames: {
+            redTag: env.RED_TAG_SHEET_NAME.trim(),
+            orangeTag: env.ORANGE_TAG_SHEET_NAME.trim(),
+            workRequest: env.WORK_REQUEST_SHEET_NAME.trim()
+        },
         technicianSheetName: env.TECHNICIAN_SHEET_NAME.trim(),
         geminiApiKey: env.GEMINI_API_KEY?.trim() || null,
         geminiModel: env.GEMINI_MODEL?.trim() || "gemini-flash-lite-latest",
