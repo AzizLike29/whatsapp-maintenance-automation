@@ -25,17 +25,18 @@ export function extractField(messageText, label) {
     return EMPTY_VALUES.includes(value) ? null : value;
 }
 
-// Pecah pesan per blok, tiap blok diawali baris label
-export function splitByField(messageText, label) {
-    const expectedLabel = normalizeLabel(label);
+// Pecah pesan per blok, tiap blok diawali salah satu label
+export function splitByField(messageText, labels) {
     const blocks = [];
 
     for (const line of messageText.split("\n")) {
-        if (labelOf(line) === expectedLabel) {
-            blocks.push([]);
+        const label = labels.find((label) => normalizeLabel(label) === labelOf(line));
+
+        if (label) {
+            blocks.push({ label, lines: [] });
         }
-        blocks.at(-1)?.push(line);
+        blocks.at(-1)?.lines.push(line);
     }
 
-    return blocks.map((lines) => lines.join("\n"));
+    return blocks.map(({ label, lines }) => ({ label, text: lines.join("\n") }));
 }
