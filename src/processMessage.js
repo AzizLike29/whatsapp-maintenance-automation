@@ -37,13 +37,13 @@ async function processBlock({ type, text }, tags, { message, redTagRepository })
     const missingLabels = labels.filter((label) => !fields[label]);
 
     if (missingLabels.length > 0) {
-        return { status: PROCESSING_STATUS.INVALID, tag: tagInput ?? "-", detail: buildMissingFieldsResult(missingLabels) };
+        return { status: PROCESSING_STATUS.INVALID, type, tag: tagInput ?? "-", detail: buildMissingFieldsResult(missingLabels) };
     }
 
     const { redTag, reason } = findRedTagToUpdate(tags, tagInput, isReopen);
 
     if (!redTag) {
-        return { status: PROCESSING_STATUS.INVALID, tag: tagInput, detail: reason };
+        return { status: PROCESSING_STATUS.INVALID, type, tag: tagInput, detail: reason };
     }
 
     try {
@@ -51,20 +51,18 @@ async function processBlock({ type, text }, tags, { message, redTagRepository })
             await redTagRepository.reopenTag(type, redTag.rowNumber);
             redTag.closedAt = "";
             logger.info(`${name} ${redTag.tagNumber} dibuka kembali di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
-            return { status: PROCESSING_STATUS.PROCESSED, tag: redTag.tagNumber, detail: RED_TAG_RESULT.REOPENED };
+            return { status: PROCESSING_STATUS.PROCESSED, type, tag: redTag.tagNumber, detail: RED_TAG_RESULT.REOPENED };
         }
-
         const closedDate = message.receivedAt.slice(0, 10);
         const solution = fields[sheetLabels.SOLUTION];
         const solvedBy = fields[sheetLabels.SOLVED_BY];
-
         await redTagRepository.closeTag(type, { rowNumber: redTag.rowNumber, solvedBy, solution, closedDate });
         redTag.closedAt = closedDate;
         logger.info(`${name} ${redTag.tagNumber} di-close di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
-        return { status: PROCESSING_STATUS.PROCESSED, tag: redTag.tagNumber, detail: buildClosedResult(solution, solvedBy) };
+        return { status: PROCESSING_STATUS.PROCESSED, type, tag: redTag.tagNumber, detail: buildClosedResult(solution, solvedBy) };
     } catch (error) {
         logger.error(`Gagal menyimpan ${name} ${redTag.tagNumber}, messageId=${message.messageId}: ${error.message}`);
-        return { status: PROCESSING_STATUS.ERROR, tag: redTag.tagNumber, detail: RED_TAG_RESULT.FAILED };
+        return { status: PROCESSING_STATUS.ERROR, type, tag: redTag.tagNumber, detail: RED_TAG_RESULT.FAILED };
     }
 }
 
