@@ -10,7 +10,7 @@ Receive WhatsApp Message        (whatsAppClient.js)
   → Validate Source Group        (processMessage.js)
   → Require Bot Mention
   → Check Sender Is a Technician (Data Teknisi tab)
-  → With No Tag / No OT / No WR:
+  → With No RT / No OT / No WR:
       Split Message per Block    (extractField.js)
       Close or Reopen Each Row   (googleSheetsRepository.js)
       Send One Summary Reply     (acknowledgementMessages.js)
@@ -19,28 +19,28 @@ Receive WhatsApp Message        (whatsAppClient.js)
 ```
 
 - Messages from groups not listed in `ALLOWED_GROUP_IDS` are ignored.
-- Only messages that mention the bot are processed. Messages with a `No Tag:`, `No OT:`, or `No WR:` line close or reopen rows; other mentions are answered by the AI when `GEMINI_API_KEY` is set, otherwise ignored.
+- Only messages that mention the bot are processed. Messages with a `No RT:`, `No OT:`, or `No WR:` line close or reopen rows; other mentions are answered by the AI when `GEMINI_API_KEY` is set, otherwise ignored.
 - Only senders whose WhatsApp number is in column E of the `Data Teknisi` tab can use the bot.
 - Messages sent from the bot's own WhatsApp account are ignored, so test from another number.
 
 ## Message Format
 
-Each field must be on its own line, below the mention. Labels are case-insensitive and tolerate extra spaces and WhatsApp bold (`*No Tag*:`).
+Each field must be on its own line, below the mention. Labels are case-insensitive and tolerate extra spaces and WhatsApp bold (`*No RT*:`).
 
-Close a tag:
+Close a Red Tag:
 
 ```text
 @Bot
-No Tag: 24308
+No RT: 24308
 Penanggulangan: Ganti belt
 PIC: Alim
 ```
 
-Reopen a tag:
+Reopen a Red Tag:
 
 ```text
 @Bot
-No Tag: 24308
+No RT: 24308
 Status: Open
 ```
 
@@ -48,11 +48,11 @@ Several tags in one message (mention the bot once, list numbers are optional, ea
 
 ```text
 @Bot
-1. No Tag: 24308
+1. No RT: 24308
 Penanggulangan: Ganti belt
 PIC: Alim
 
-2. No Tag: 24311
+2. No RT: 24311
 Status: Open
 ```
 
@@ -60,7 +60,7 @@ Each sheet has its own number label:
 
 | Sheet        | Number label | Other labels                 |
 | ------------ | ------------ | ---------------------------- |
-| Red Tag      | `No Tag`     | `Penanggulangan`, `PIC`      |
+| Red Tag      | `No RT`      | `Penanggulangan`, `PIC`      |
 | Orange Tag   | `No OT`      | `Penanggulangan`, `PIC`      |
 | Work Request | `No WR`      | `Penanggulangan`, `Executor` |
 
