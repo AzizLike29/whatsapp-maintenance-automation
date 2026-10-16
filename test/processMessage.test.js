@@ -6,8 +6,8 @@ import { processMessage } from "../src/processMessage.js";
 const ALLOWED_GROUP_ID = "120363000000000000@g.us";
 const BOT_JID = "6281111111111@s.whatsapp.net";
 const TECHNICIAN_PHONE = "6285855303520";
-const CLOSE_TEXT = "@bot\nNo Tag: 24308\nPenanggulangan: Ganti belt\nPIC: Alim";
-const REOPEN_TEXT = "@bot\nNo Tag: 24308\nStatus: Open";
+const CLOSE_TEXT = "@bot\nNo RT: 24308\nPenanggulangan: Ganti belt\nPIC: Alim";
+const REOPEN_TEXT = "@bot\nNo RT: 24308\nStatus: Open";
 const OPEN_TAG = { rowNumber: 5789, tagNumber: "RT/LINEB/07/2026/24308", closedAt: "" };
 const CLOSED_TAG = { ...OPEN_TAG, closedAt: "12/10/2026" };
 
@@ -59,7 +59,7 @@ function createDependencies({ redTags = [], tags = {}, failOnWrite = false } = {
     };
 }
 
-test("close tag yang masih Open dan balas dengan No Tag lengkap", async () => {
+test("close tag yang masih Open dan balas dengan No RT lengkap", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
     const status = await processMessage(createMessage(), dependencies);
 
@@ -85,15 +85,15 @@ test("proses banyak tag bernomor dalam satu pesan", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG, otherOpenTag, otherClosedTag] });
     const messageText = [
         "@bot",
-        "1. No Tag: 24308",
+        "1. No RT: 24308",
         "Penanggulangan: Ganti belt",
         "PIC: Alim",
         "",
-        "2. No Tag: 24311",
+        "2. No RT: 24311",
         "Penanggulangan: Ganti bearing",
         "PIC: Joko",
         "",
-        "3. No Tag: 24315",
+        "3. No RT: 24315",
         "Penanggulangan: Setting sensor",
         "PIC: Alim"
     ].join("\n");
@@ -147,7 +147,7 @@ test("close Orange Tag dan WR dalam satu pesan sesuai label", async () => {
     ]);
 });
 
-test("minta No Tag lengkap kalau nomor belakang cocok dengan beberapa tag Open", async () => {
+test("minta No RT lengkap kalau nomor belakang cocok dengan beberapa tag Open", async () => {
     const otherOpenTag = { rowNumber: 100, tagNumber: "RT/LINEA/01/2025/24308", closedAt: "" };
     const dependencies = createDependencies({ redTags: [OPEN_TAG, otherOpenTag] });
 
@@ -168,7 +168,7 @@ test("balas tag tidak ditemukan", async () => {
 
 test("sebutkan field yang belum diisi saat close", async () => {
     const dependencies = createDependencies({ redTags: [OPEN_TAG] });
-    const status = await processMessage(createMessage({ messageText: "@bot\nNo Tag: 24308\nOleh: Alim" }), dependencies);
+    const status = await processMessage(createMessage({ messageText: "@bot\nNo RT: 24308\nOleh: Alim" }), dependencies);
 
     assert.equal(status, "INVALID");
     assert.equal(dependencies.closedTags.length, 0);
@@ -217,7 +217,7 @@ test("tolak pengirim yang bukan teknisi terdaftar", async () => {
     assert.deepEqual(dependencies.replies, ["Nomor Anda belum terdaftar sebagai teknisi. Silakan hubungi admin Aziz untuk mendapatkan bantuan ya😉"]);
 });
 
-test("jawab pertanyaan tanpa No Tag dengan AI", async () => {
+test("jawab pertanyaan tanpa No RT dengan AI", async () => {
     const dependencies = { ...createDependencies(), aiAssistant: { ask: async (question) => `Jawaban: ${question}` } };
     const status = await processMessage(createMessage({ messageText: "@6281111111111 berapa tag open?" }), dependencies);
 
