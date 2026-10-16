@@ -1,4 +1,4 @@
-import { ASIA_JAKARTA, PROCESSING_STATUS } from "./constants.js";
+import { ASIA_JAKARTA, PROCESSING_STATUS, SHEET_TYPES } from "./constants.js";
 
 // Keterangan hasil per tag
 export const RED_TAG_RESULT = {
@@ -29,14 +29,22 @@ function formatDate(receivedAt) {
     });
 }
 
+// Template balasan dari BOT whatsApp
+function buildUpdateTitle(results) {
+    const names = [...new Set(results.map(({ type }) => SHEET_TYPES[type]?.name).filter(Boolean))];
+    if (names.length === 1) {
+        return `*UPDATE ${names[0].toUpperCase()}*`;
+    }
+    return "*UPDATE MAINTENANCE*";
+}
+
 // Ringkasan semua tag dalam satu pesan
 export function buildRedTagSummaryMessage(results, receivedAt) {
     const entries = results.map(({ status, tag, detail }) =>
         `${status === PROCESSING_STATUS.PROCESSED ? "✓" : "✗"} ${tag}\n  ${detail}`
     );
-
     return [
-        "*UPDATE RED TAG*",
+        buildUpdateTitle(results),
         `_${formatDate(receivedAt)} · ${receivedAt.slice(11, 16)} WIB_`,
         "```" + entries.join("\n\n") + "```"
     ].join("\n");
