@@ -95,6 +95,26 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
                 await onMessage(rawMessage, { sendReply, botJids });
             }
         });
+
+        // Pesan yang di-edit, misalnya baru ditambah mention bot
+        socket.ev.on("messages.update", async (updates) => {
+            const botJids = [socket.user?.id, socket.user?.lid].filter(Boolean).map(jidNormalizedUser);
+
+            for (const { key, update } of updates) {
+                if (!update?.message?.editedMessage) {
+                    continue;
+                }
+
+                const rawMessage = {
+                    key,
+                    message: update.message,
+                    messageTimestamp: update.messageTimestamp,
+                    pushName: undefined
+                };
+
+                await onMessage(rawMessage, { sendReply, botJids });
+            }
+        });
     }
 
     connect();

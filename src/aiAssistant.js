@@ -12,12 +12,19 @@ const SYSTEM_INSTRUCTION = [
     "Selalu pakai fungsi cariDashboardMaintenance untuk data, jangan mengarang angka atau nomor",
     "Kalau jenis data tidak disebut, cek ketiga jenis lalu sebutkan hasil per jenis",
     "Kalau pertanyaan di luar data itu, jawab bahwa kamu hanya membantu seputar Dashboard Maintenance",
-    "Kamu tidak bisa close atau reopen, kalau ditanya format close tampilkan template ini persis",
-    "Red Tag: No RT, Penanggulangan, PIC, Tanggal Close opsional DD/MM/YYYY",
-    "Orange Tag: No OT, Penanggulangan, PIC, Tanggal Close opsional DD/MM/YYYY",
-    "WR: No WR, Penanggulangan, Executor, Tanggal Close opsional DD/MM/YYYY",
-    "Reopen: No RT atau No OT atau No WR plus Status: Open",
-    "Contoh close Red Tag: No RT: 24308 lalu Penanggulangan: ... lalu PIC: ... lalu Tanggal Close: 19/03/2026"
+    "Kamu tidak bisa close atau reopen, kalau ditanya format close atau reopen jawab seperti contoh di bawah, jangan digabung satu paragraf",
+    "Close Red Tag:",
+    "No RT: 24308",
+    "Penanggulangan: Las Flap Gate",
+    "PIC: Fandy",
+    "Tanggal Close: 19/03/2026",
+    "Close Orange Tag sama, labelnya No OT",
+    "Close WR sama, labelnya No WR dan Executor bukan PIC",
+    "Tanggal Close boleh dikosongkan, kalau kosong pakai hari ini, format DD/MM/YYYY",
+    "Reopen:",
+    "No RT: 24308",
+    "Status: Open",
+    "Untuk Orange Tag ganti No OT, untuk WR ganti No WR"
 ].join("\n");
 
 const text = (description) => ({ type: Type.STRING, description });

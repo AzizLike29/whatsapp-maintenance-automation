@@ -9,7 +9,7 @@ function toJakartaIsoString(date) {
 
 // Ambil teks pesan
 function extractMessageText(content) {
-    return content?.conversation ?? content?.extendedTextMessage?.text ?? null;
+    return content?.conversation ?? content?.extendedTextMessage?.text ?? content?.editedMessage?.message?.conversation ?? content?.editedMessage?.message?.extendedTextMessage?.text ?? null;
 }
 
 // Nomor HP pengirim, grup LID pakai participantAlt
@@ -38,7 +38,7 @@ export function normalizeMessage(rawMessage) {
         senderName: rawMessage.pushName ?? key.participant ?? "",
         senderPhone: extractSenderPhone(key),
         messageText,
-        mentionedJids: (rawMessage.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? []).map(jidNormalizedUser),
+        mentionedJids: (rawMessage.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? rawMessage.message?.editedMessage?.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? []).map(jidNormalizedUser),
         receivedAt: toJakartaIsoString(new Date(Number(rawMessage.messageTimestamp) * 1000)),
         rawMessage
     };
