@@ -34,6 +34,7 @@ Close a Red Tag:
 No RT: 24308
 Penanggulangan: Ganti belt
 PIC: Alim
+Tanggal Close: 19/03/2026
 ```
 
 Reopen a Red Tag:
@@ -71,15 +72,19 @@ Close an Orange Tag and a Work Request in one message:
 No OT: OT/LINEC/04/2026/06755
 Penanggulangan: Pengelasan plat
 PIC: Wahyu
+Tanggal Close: 19/03/2026
 
 No WR: 194889
 Penanggulangan: Pasang sensor
 Executor: Ripal
+Tanggal Close: 19/03/2026
 ```
 
 Reopen works the same for every sheet: the number label plus `Status: Open`.
 
-The bot replies once with a summary of every tag, including the close date and time (WIB). A failed tag does not stop the others.
+The bot replies once with a summary of every tag, including the date (no time). A failed tag does not stop the others.
+
+`Tanggal Close` is optional (`DD/MM/YYYY`). If omitted, today's date is used.
 
 A number accepts the full value (`RT/LINEB/07/2026/24308`) or only its trailing number (`24308`, leading zeros optional). Trailing numbers repeat across years, so a close only matches rows that are still Open and a reopen only matches rows that are Closed. When more than one row still matches, nothing is changed and the bot asks for the full number.
 
