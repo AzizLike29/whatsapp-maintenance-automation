@@ -18,3 +18,6 @@ export const SHEET_TYPES = {
 
 // Label reopen, bukan field wajib
 export const STATUS_LABEL = "Status";
+
+// Label Tanggal close yang ditentukan
+export const CLOSE_DATE_LABEL = "Tanggal Close";
