@@ -7,7 +7,8 @@ export const RED_TAG_RESULT = {
     ALREADY_CLOSED: "Sudah Close sebelumnya",
     ALREADY_OPEN: "Masih Open, jadi tidak perlu dibuka lagi",
     DUPLICATE: "Ada beberapa data dengan nomor ini, tulis nomor lengkap ya",
-    FAILED: "Gagal menyimpan ke spreadsheet, coba kirim ulang"
+    FAILED: "Gagal menyimpan ke spreadsheet, coba kirim ulang",
+    INVALID_CLOSE_DATE: "Format Tgl Close salah ya, silahkan pakai format ini DD/MM/YYYY"
 };
 
 export function buildClosedResult(solution, solvedBy) {
@@ -45,7 +46,7 @@ export function buildRedTagSummaryMessage(results, receivedAt) {
     );
     return [
         buildUpdateTitle(results),
-        `_${formatDate(receivedAt)} · ${receivedAt.slice(11, 16)} WIB_`,
+        `_${formatDate(receivedAt)}_`,
         "```" + entries.join("\n\n") + "```"
     ].join("\n");
 }
