@@ -1,11 +1,21 @@
 import { buildAiUnavailableMessage, buildClosedResult, buildMissingFieldsResult, buildNotTechnicianMessage, buildRedTagSummaryMessage, RED_TAG_RESULT } from "./acknowledgementMessages.js";
-import { PROCESSING_STATUS, SHEET_TYPES, STATUS_LABEL } from "./constants.js";
+import { CLOSE_DATE_LABEL, PROCESSING_STATUS, SHEET_TYPES, STATUS_LABEL } from "./constants.js";
 import { extractField, splitByField } from "./extractField.js";
 import { isSameTag } from "./googleSheetsRepository.js";
 import { logger } from "./logger.js";
 
 // Jenis sheet berdasarkan label nomor
 const TYPE_BY_LABEL = Object.fromEntries(Object.entries(SHEET_TYPES).map(([type, { labels }]) => [labels.TAG_NUMBER, type]));
+
+// Ubah format DD/MM/YYYY jadi YYYY-MM-DD
+function parseCloseDate(value) {
+    const match = String(value).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) {
+        return null;
+    }
+    const [, day, month, year] = match;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
 
 // Cari satu tag sesuai status, kalau gagal kembalikan alasannya
 function findRedTagToUpdate(redTags, tagInput, wantClosed) {
@@ -27,7 +37,7 @@ function findRedTagToUpdate(redTags, tagInput, wantClosed) {
     return { redTag: candidates[0] };
 }
 
-// Close atau reopen satu blok, closedAt ikut diubah supaya nomor sama di blok berikutnya terbaca benar
+// Close atau reopen satu blok, Tanggal Close opsional kalau diisi
 async function processBlock({ type, text }, tags, { message, redTagRepository }) {
     const { name, labels: sheetLabels } = SHEET_TYPES[type];
     const isReopen = extractField(text, STATUS_LABEL)?.toLowerCase() === "open";
@@ -53,7 +63,15 @@ async function processBlock({ type, text }, tags, { message, redTagRepository })
             logger.info(`${name} ${redTag.tagNumber} dibuka kembali di baris ${redTag.rowNumber}, messageId=${message.messageId}`);
             return { status: PROCESSING_STATUS.PROCESSED, type, tag: redTag.tagNumber, detail: RED_TAG_RESULT.REOPENED };
         }
-        const closedDate = message.receivedAt.slice(0, 10);
+        const rawCloseDate = extractField(text, CLOSE_DATE_LABEL);
+        let closedDate = message.receivedAt.slice(0, 10);
+
+        if (rawCloseDate) {
+            closedDate = parseCloseDate(rawCloseDate);
+            if (!closedDate) {
+                return { status: PROCESSING_STATUS.INVALID, type, tag: redTag.tagNumber, detail: RED_TAG_RESULT.INVALID_CLOSE_DATE };
+            }
+        }
         const solution = fields[sheetLabels.SOLUTION];
         const solvedBy = fields[sheetLabels.SOLVED_BY];
         await redTagRepository.closeTag(type, { rowNumber: redTag.rowNumber, solvedBy, solution, closedDate });
