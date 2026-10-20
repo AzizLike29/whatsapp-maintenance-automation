@@ -12,7 +12,7 @@ const OPEN_TAG = { rowNumber: 5789, tagNumber: "RT/LINEB/07/2026/24308", closedA
 const CLOSED_TAG = { ...OPEN_TAG, closedAt: "12/10/2026" };
 
 // Balasan ringkasan template whatsapp, contoh:
-const summary = (...entries) => `*UPDATE RED TAG*\n_Senin, 12 Okt 2026 · 16:00 WIB_\n\`\`\`${entries.join("\n\n")}\`\`\``;
+const summary = (...entries) => `*UPDATE RED TAG*\n_Senin, 12 Okt 2026_\n\`\`\`${entries.join("\n\n")}\`\`\``;
 
 // Pesan palsu, default close valid
 function createMessage(overrides = {}) {
@@ -68,6 +68,31 @@ test("close tag yang masih Open dan balas dengan No RT lengkap", async () => {
         { type: "redTag", rowNumber: 5789, solvedBy: "Alim", solution: "Ganti belt", closedDate: "2026-10-12" }
     ]);
     assert.deepEqual(dependencies.replies, [summary("✓ RT/LINEB/07/2026/24308\n  Close · Ganti belt · Alim")]);
+});
+
+test("close pakai Tanggal Close yang dipilih teknisi", async () => {
+    const dependencies = createDependencies({ redTags: [OPEN_TAG] });
+    const messageText = "@bot\nNo RT: 24308\nPenanggulangan: Ganti belt\nPIC: Alim\nTanggal Close: 19/03/2026";
+
+    const status = await processMessage(createMessage({ messageText }), dependencies);
+
+    assert.equal(status, "PROCESSED");
+    assert.deepEqual(dependencies.closedTags, [
+        { type: "redTag", rowNumber: 5789, solvedBy: "Alim", solution: "Ganti belt", closedDate: "2026-03-19" }
+    ]);
+});
+
+test("tolak Tanggal Close kalau format salah", async () => {
+    const dependencies = createDependencies({ redTags: [OPEN_TAG] });
+    const messageText = "@bot\nNo RT: 24308\nPenanggulangan: Ganti belt\nPIC: Alim\nTanggal Close: 19-03-2026";
+
+    const status = await processMessage(createMessage({ messageText }), dependencies);
+
+    assert.equal(status, "INVALID");
+    assert.equal(dependencies.closedTags.length, 0);
+    assert.deepEqual(dependencies.replies, [
+        summary("✗ RT/LINEB/07/2026/24308\n  Format Tgl Close salah ya, silahkan pakai format ini DD/MM/YYYY")
+    ]);
 });
 
 test("buka kembali tag yang sudah Close lewat Status Open", async () => {
