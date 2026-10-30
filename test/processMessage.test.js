@@ -267,9 +267,10 @@ test("permintaan PDF membalas tunggu lalu kirim dokumen", async () => {
         aiAssistant: { ask: async () => ({ action: "exportPdf", jenis: "redTag", tahun: null }) },
         sendTyping: async (message) => typing.push(message.messageId),
         sendDocument: async (_message, doc) => documents.push(doc),
-        exportReport: async ({ type, requestedYear }) => {
+        exportReport: async ({ type, requestedYear, filters }) => {
             assert.equal(type, "redTag");
             assert.equal(requestedYear, null);
+            assert.equal(filters?.pic, undefined);
             return {
                 filename: "RT 12OKT26.pdf",
                 pdf: Buffer.from("pdf"),
@@ -284,11 +285,35 @@ test("permintaan PDF membalas tunggu lalu kirim dokumen", async () => {
     const status = await processMessage(createMessage({ messageText: "@bot buatkan pdf template RT" }), dependencies);
 
     assert.equal(status, "PROCESSED");
-    assert.equal(dependencies.replies[0], "siap tuan saya akan buatkan, tolong tunggu ya");
+    assert.equal(dependencies.replies[0], "Siap, saya buatkan dulu ya");
     assert.equal(typing.length, 1);
     assert.equal(documents[0].filename, "RT 12OKT26.pdf");
     assert.match(documents[0].caption, /tahun 2026/);
     assert.match(documents[0].caption, /RT 12OKT26\.pdf/);
+});
+
+test("permintaan PDF PIC meneruskan filter ke export", async () => {
+    let received;
+    const dependencies = {
+        ...createDependencies(),
+        aiAssistant: { ask: async () => ({ action: "exportPdf", jenis: "redTag", tahun: null, filters: { pic: "JSU" } }) },
+        sendDocument: async () => { },
+        exportReport: async (args) => {
+            received = args;
+            return {
+                filename: "RT 12OKT26.pdf",
+                pdf: Buffer.from("pdf"),
+                year: "2026",
+                folderLabel: "Tag",
+                folderUrl: "https://example/tag",
+                uploaded: true
+            };
+        }
+    };
+
+    await processMessage(createMessage({ messageText: "@bot buatkan pdf RT PIC JSU" }), dependencies);
+
+    assert.equal(received.filters.pic, "JSU");
 });
 
 test("PDF tetap dikirim ke WhatsApp kalau upload SharePoint belum diizinkan", async () => {
@@ -325,6 +350,6 @@ test("gagal membuat PDF dibalas pesan error", async () => {
     const status = await processMessage(createMessage({ messageText: "@bot buatkan pdf WR" }), dependencies);
 
     assert.equal(status, "ERROR");
-    assert.equal(dependencies.replies[0], "siap tuan saya akan buatkan, tolong tunggu ya");
+    assert.equal(dependencies.replies[0], "Siap, saya buatkan dulu ya");
     assert.equal(dependencies.replies[1], "Maaf, gagal membuat PDF. Silakan coba kembali beberapa saat lagi ya");
 });
