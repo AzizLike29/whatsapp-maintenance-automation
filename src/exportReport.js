@@ -1,4 +1,5 @@
 import { PublicClientApplication } from "@azure/msal-node";
+import { auth } from "@googleapis/sheets";
 import ExcelJS from "exceljs";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -13,6 +14,9 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 const MONTHS_FILE = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGS", "SEP", "OKT", "NOV", "DES"];
 const MONTHS_HEADER = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
 const SCOPES = ["Files.ReadWrite.All", "offline_access"];
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+const DRIVE_FILES = "https://www.googleapis.com/drive/v3/files";
 const DEFAULT_SITE = "onekn-my.sharepoint.com:/personal/nila_agustina_kalbenutritionals_com";
 const DEFAULT_LINKS = {
     wr: "https://onekn-my.sharepoint.com/shared?id=%2Fpersonal%2Fnila%5Fagustina%5Fkalbenutritionals%5Fcom%2FDocuments%2FData%20Sanghiang%2FOps%20Adm%2FTemplate%2FWR",
@@ -115,6 +119,18 @@ export function buildDoneMessage({ year, filename, folderLabel, folderUrl }) {
         filename,
         "",
         `Tambahan info, pdf ini sudah saya upload ke dalam link template ${folderLabel}.`,
+        folderUrl
+    ].join("\n");
+}
+
+// Pesan PDF terkirim, upload SharePoint masih menunggu IT
+export function buildPendingUploadMessage({ year, filename, folderLabel, folderUrl }) {
+    return [
+        `Berikut format PDF yang aku berikan untuk tahun ${year}.`,
+        "",
+        filename,
+        "",
+        `Upload ke link template ${folderLabel} masih menunggu izin IT. Kalau sudah disetujui, minta PDF lagi ya.`,
         folderUrl
     ].join("\n");
 }
@@ -233,28 +249,20 @@ function getMsalApp(clientId) {
     return msalApp;
 }
 
-// Ambil token Microsoft, minta kode login di terminal jika perlu
-async function getAccessToken(clientId) {
+// Ambil token Microsoft yang sudah tersimpan, tanpa minta kode login
+async function getSilentAccessToken(clientId) {
     const app = getMsalApp(clientId);
     const accounts = await app.getTokenCache().getAllAccounts();
 
-    if (accounts[0]) {
-        try {
-            const silent = await app.acquireTokenSilent({ account: accounts[0], scopes: SCOPES });
-            if (silent?.accessToken) {
-                return silent.accessToken;
-            }
-        } catch (error) {
-            logger.warn(`Token Microsoft kedaluwarsa, minta login ulang: ${error.message}`);
-        }
+    if (!accounts[0]) {
+        throw new Error("Login Microsoft belum ada");
     }
 
-    logger.info("Login Microsoft: buka tautan di HP lalu ketik kode yang muncul di bawah");
-    const result = await app.acquireTokenByDeviceCode({
-        scopes: SCOPES,
-        deviceCodeCallback: (response) => logger.info(response.message)
-    });
-    return result.accessToken;
+    const silent = await app.acquireTokenSilent({ account: accounts[0], scopes: SCOPES });
+    if (!silent?.accessToken) {
+        throw new Error("Token Microsoft tidak tersedia");
+    }
+    return silent.accessToken;
 }
 
 // Unggah file ke Graph
@@ -270,28 +278,51 @@ async function graphPut(url, body, contentType, token) {
     return response;
 }
 
-// Ubah Excel jadi PDF lalu unggah ke SharePoint
-export async function convertAndUploadSharePoint({ type, filename, xlsx }, { clientId, site, folderUrls }) {
-    const report = REPORT_TYPES[type];
-    const token = await getAccessToken(clientId);
-    const tempName = `bot-temp-${Date.now()}.xlsx`;
-    const tempPath = `/me/drive/root:/WhatsAppMaintenanceTemp/${tempName}`;
-
-    await graphPut(
-        `${GRAPH}${tempPath}:/content`,
-        xlsx,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        token
-    );
-
-    const pdfResponse = await fetch(`${GRAPH}${tempPath}:/content?format=pdf`, {
+// Ubah Excel jadi PDF lewat Google Drive
+export async function convertXlsxToPdf(xlsx, filename) {
+    const googleAuth = new auth.GoogleAuth({ scopes: [DRIVE_SCOPE] });
+    const client = await googleAuth.getClient();
+    const access = await client.getAccessToken();
+    const token = access?.token || access;
+    const boundary = "botpdf";
+    const metadata = JSON.stringify({
+        name: filename.replace(/\.pdf$/i, ".xlsx"),
+        mimeType: "application/vnd.google-apps.spreadsheet"
+    });
+    const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
+        Buffer.from(`--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`),
+        Buffer.isBuffer(xlsx) ? xlsx : Buffer.from(xlsx),
+        Buffer.from(`\r\n--${boundary}--`)
+    ]);
+    const upload = await fetch(DRIVE_UPLOAD, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": `multipart/related; boundary=${boundary}`
+        },
+        body
+    });
+    if (!upload.ok) {
+        throw new Error(`Drive upload ${upload.status}: ${await upload.text()}`);
+    }
+    const file = await upload.json();
+    const pdfResponse = await fetch(`${DRIVE_FILES}/${file.id}/export?mimeType=application/pdf`, {
         headers: { Authorization: `Bearer ${token}` }
     });
     if (!pdfResponse.ok) {
-        throw new Error(`Graph PDF ${pdfResponse.status}: ${await pdfResponse.text()}`);
+        await fetch(`${DRIVE_FILES}/${file.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+        throw new Error(`Drive PDF ${pdfResponse.status}: ${await pdfResponse.text()}`);
     }
     const pdf = Buffer.from(await pdfResponse.arrayBuffer());
+    await fetch(`${DRIVE_FILES}/${file.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    return pdf;
+}
 
+// Unggah PDF ke folder SharePoint kalau token Microsoft sudah ada
+export async function uploadPdfToSharePoint({ type, filename, pdf }, { clientId, site }) {
+    const report = REPORT_TYPES[type];
+    const token = await getSilentAccessToken(clientId);
     const folderPath = `${report.folderPath}/${filename}`;
     await graphPut(
         `${GRAPH}/sites/${site}:/drive/root:/${folderPath}:/content`,
@@ -299,10 +330,6 @@ export async function convertAndUploadSharePoint({ type, filename, xlsx }, { cli
         "application/pdf",
         token
     );
-
-    await fetch(`${GRAPH}${tempPath}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-
-    return { pdf, folderUrl: folderUrls[report.folderKey] || DEFAULT_LINKS[report.folderKey] };
 }
 
 // Buat PDF dari data Open dashboard
@@ -311,32 +338,47 @@ export async function exportPdfReport({
     requestedYear,
     receivedAt,
     listDetails,
-    convertAndUpload,
+    fill = fillTemplate,
+    convertXlsxToPdf: convertPdf = convertXlsxToPdf,
+    uploadPdf,
     folderUrls = DEFAULT_LINKS
 }) {
     const report = REPORT_TYPES[type];
     const year = reportYear(receivedAt, requestedYear);
     const rows = filterOpenRows(await listDetails(type), year);
-    const xlsx = await fillTemplate(type, rows, { year, receivedAt });
+    const xlsx = await fill(type, rows, { year, receivedAt });
     const filename = buildFileName(report.prefix, receivedAt);
-    const uploaded = await convertAndUpload({ type, filename, xlsx });
+    const pdf = await convertPdf(xlsx, filename);
+    let uploaded = false;
+
+    if (uploadPdf) {
+        try {
+            await uploadPdf({ type, filename, pdf });
+            uploaded = true;
+        } catch (error) {
+            logger.warn(`Upload SharePoint ditunda: ${error.message}`);
+        }
+    }
+
     return {
         filename,
-        pdf: uploaded.pdf,
+        pdf,
         year,
         folderLabel: report.folderLabel,
-        folderUrl: uploaded.folderUrl || folderUrls[report.folderKey]
+        folderUrl: folderUrls[report.folderKey] || DEFAULT_LINKS[report.folderKey],
+        uploaded
     };
 }
 
-// Hubungkan ekspor PDF ke dashboard dan SharePoint
+// Hubungkan ekspor PDF ke dashboard, Google Drive, dan SharePoint
 export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS }) {
     return ({ type, requestedYear, receivedAt }) => exportPdfReport({
         type,
         requestedYear,
         receivedAt,
         listDetails: (sheetType) => redTagRepository.listDetails(sheetType),
-        convertAndUpload: (payload) => convertAndUploadSharePoint(payload, { clientId, site, folderUrls }),
+        convertXlsxToPdf,
+        uploadPdf: (payload) => uploadPdfToSharePoint(payload, { clientId, site }),
         folderUrls
     });
 }
