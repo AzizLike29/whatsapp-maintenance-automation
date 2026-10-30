@@ -8,7 +8,7 @@ const MAX_STEPS = 4;
 const SYSTEM_INSTRUCTION = [
     "Kamu asisten data Dashboard Maintenance di grup WhatsApp",
     "Data yang tersedia saat ini: Red Tag, Orange Tag, dan Work Request (WR)",
-    "Jawab dalam bahasa Indonesia, singkat dan jelas, tanpa emoji, boleh pakai ✓ dan ✗",
+    "Jawab dalam bahasa Indonesia, ramah seperti teman, singkat dan jelas, tanpa emoji, boleh pakai ✓ dan ✗, jangan panggil tuan",
     "Selalu pakai fungsi cariDashboardMaintenance untuk data, jangan mengarang angka atau nomor",
     "Kalau jenis data tidak disebut, cek ketiga jenis lalu sebutkan hasil per jenis",
     "Kalau pertanyaan di luar data itu, jawab bahwa kamu hanya membantu seputar Dashboard Maintenance",
@@ -25,9 +25,10 @@ const SYSTEM_INSTRUCTION = [
     "No RT: 24308",
     "Status: Open",
     "Untuk Orange Tag ganti No OT, untuk WR ganti No WR",
-    "Kalau user minta buatkan PDF atau pakai template RT, OT, Red Tag, Orange Tag, atau WR, panggil buatLaporanPdf, jangan cariDashboardMaintenance",
+    "buatLaporanPdf HANYA jika user jelas minta dibuatkan file PDF, print, atau template. Kalau user bertanya, rekap, hitung, daftar, atau cari data, pakai cariDashboardMaintenance, jangan buatLaporanPdf",
     "jenis redTag untuk RT, orangeTag untuk OT, workRequest untuk WR",
-    "tahun hanya diisi kalau user menyebut tahun, kalau tidak kosongkan"
+    "tahun hanya diisi kalau user menyebut tahun, kalau tidak kosongkan",
+    "Kalau user minta PDF dengan PIC, line, department, atau filter lain, isi parameter filter itu"
 ].join("\n");
 
 const text = (description) => ({ type: Type.STRING, description });
@@ -70,7 +71,7 @@ const SEARCH_DECLARATION = {
 
 const EXPORT_DECLARATION = {
     name: "buatLaporanPdf",
-    description: "Buat PDF data Open dari dashboard memakai template RT, OT, atau WR, kirim ke WhatsApp, dan upload ke SharePoint",
+    description: "Buat PDF data Open dari dashboard memakai template RT, OT, atau WR, hanya jika user minta file PDF",
     parameters: {
         type: Type.OBJECT,
         properties: {
@@ -79,7 +80,15 @@ const EXPORT_DECLARATION = {
                 enum: Object.keys(SHEET_TYPES),
                 description: "redTag untuk Red Tag, orangeTag untuk Orange Tag, workRequest untuk Work Request"
             },
-            tahun: text("Tahun data hanya jika user menyebut, contoh 2026")
+            tahun: text("Tahun data hanya jika user menyebut, contoh 2026"),
+            line: text("Line, contoh A, B, D1"),
+            department: text("Department, contoh Produksi"),
+            kategori: text("Kategori Red Tag, PIC SYSTEM OT, atau Work Order Type WR"),
+            equipment: text("Nama mesin atau area, cocok sebagian"),
+            deskripsi: text("Kata di deskripsi, cocok sebagian"),
+            ditemukanOleh: text("Nama penemu"),
+            pic: text("PIC, contoh JSU"),
+            diselesaikanOleh: text("Nama yang menyelesaikan")
         },
         required: ["jenis"]
     }
@@ -110,7 +119,11 @@ export function createAiAssistant({ apiKey, model, redTagRepository }) {
             if (pdfCall) {
                 const jenis = SHEET_TYPES[pdfCall.args?.jenis] ? pdfCall.args.jenis : null;
                 if (jenis) {
-                    return { action: "exportPdf", jenis, tahun: pdfCall.args?.tahun?.trim() || null };
+                    const { tahun, ...rest } = pdfCall.args ?? {};
+                    const filters = Object.fromEntries(
+                        Object.entries(rest).filter(([key, value]) => key !== "jenis" && value !== undefined && String(value).trim() !== "")
+                    );
+                    return { action: "exportPdf", jenis, tahun: tahun?.trim() || null, filters };
                 }
             }
 
