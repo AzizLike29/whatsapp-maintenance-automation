@@ -26,6 +26,20 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
         await socket.sendMessage(message.groupId, { text }, { quoted: message.rawMessage });
     }
 
+    // Tampilkan status mengetik
+    async function sendTyping(message) {
+        await socket.sendPresenceUpdate("composing", message.groupId);
+    }
+
+    // Kirim file PDF
+    async function sendDocument(message, { filename, buffer, caption }) {
+        await socket.sendMessage(
+            message.groupId,
+            { document: buffer, mimetype: "application/pdf", fileName: filename, caption },
+            { quoted: message.rawMessage }
+        );
+    }
+
     // Minta kode pairing
     async function requestPairingCode() {
         try {
@@ -89,10 +103,10 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
                 return;
             }
 
-            // ID bot: nomor HP dan LID
+            // Nomor HP dan LID bot
             const botJids = [socket.user?.id, socket.user?.lid].filter(Boolean).map(jidNormalizedUser);
             for (const rawMessage of messages) {
-                await onMessage(rawMessage, { sendReply, botJids });
+                await onMessage(rawMessage, { sendReply, sendTyping, sendDocument, botJids });
             }
         });
 
@@ -112,7 +126,7 @@ export async function startWhatsAppClient({ phoneNumber, onMessage }) {
                     pushName: undefined
                 };
 
-                await onMessage(rawMessage, { sendReply, botJids });
+                await onMessage(rawMessage, { sendReply, sendTyping, sendDocument, botJids });
             }
         });
     }
