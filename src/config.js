@@ -33,6 +33,7 @@ export function loadConfig(env = process.env) {
         geminiApiKey: env.GEMINI_API_KEY?.trim() || null,
         geminiModel: env.GEMINI_MODEL?.trim() || "gemini-flash-lite-latest",
         whatsAppPhoneNumber,
+        googleDrivePdfFolderId: env.GOOGLE_DRIVE_PDF_FOLDER_ID?.trim() || "",
         // Pakai client Graph PowerShell, ganti MICROSOFT_CLIENT_ID kalau tenant menolak
         microsoftClientId: env.MICROSOFT_CLIENT_ID?.trim() || "14d82eec-204b-4c2f-b7e8-296a70dab67e",
         sharePointSite: env.SHAREPOINT_SITE?.trim() || "onekn-my.sharepoint.com:/personal/nila_agustina_kalbenutritionals_com",
