@@ -258,3 +258,49 @@ test("balas AI tidak tersedia kalau AI gagal", async () => {
     assert.equal(status, "ERROR");
     assert.deepEqual(dependencies.replies, ["Maaf, layanan AI sedang mengalami kendala. Silakan coba kembali beberapa saat lagi ya😉"]);
 });
+
+test("permintaan PDF membalas tunggu lalu kirim dokumen", async () => {
+    const documents = [];
+    const typing = [];
+    const dependencies = {
+        ...createDependencies(),
+        aiAssistant: { ask: async () => ({ action: "exportPdf", jenis: "redTag", tahun: null }) },
+        sendTyping: async (message) => typing.push(message.messageId),
+        sendDocument: async (_message, doc) => documents.push(doc),
+        exportReport: async ({ type, requestedYear }) => {
+            assert.equal(type, "redTag");
+            assert.equal(requestedYear, null);
+            return {
+                filename: "RT 12OKT26.pdf",
+                pdf: Buffer.from("pdf"),
+                year: "2026",
+                folderLabel: "Tag",
+                folderUrl: "https://example/tag"
+            };
+        }
+    };
+
+    const status = await processMessage(createMessage({ messageText: "@bot buatkan pdf template RT" }), dependencies);
+
+    assert.equal(status, "PROCESSED");
+    assert.equal(dependencies.replies[0], "siap tuan saya akan buatkan, tolong tunggu ya");
+    assert.equal(typing.length, 1);
+    assert.equal(documents[0].filename, "RT 12OKT26.pdf");
+    assert.match(documents[0].caption, /tahun 2026/);
+    assert.match(documents[0].caption, /RT 12OKT26\.pdf/);
+});
+
+test("gagal membuat PDF dibalas pesan error", async () => {
+    const dependencies = {
+        ...createDependencies(),
+        aiAssistant: { ask: async () => ({ action: "exportPdf", jenis: "workRequest", tahun: "2026" }) },
+        sendDocument: async () => { },
+        exportReport: async () => { throw new Error("SharePoint gagal"); }
+    };
+
+    const status = await processMessage(createMessage({ messageText: "@bot buatkan pdf WR" }), dependencies);
+
+    assert.equal(status, "ERROR");
+    assert.equal(dependencies.replies[0], "siap tuan saya akan buatkan, tolong tunggu ya");
+    assert.equal(dependencies.replies[1], "Maaf, gagal membuat PDF. Silakan coba kembali beberapa saat lagi ya");
+});
