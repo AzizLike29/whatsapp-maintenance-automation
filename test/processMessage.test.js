@@ -275,7 +275,8 @@ test("permintaan PDF membalas tunggu lalu kirim dokumen", async () => {
                 pdf: Buffer.from("pdf"),
                 year: "2026",
                 folderLabel: "Tag",
-                folderUrl: "https://example/tag"
+                folderUrl: "https://example/tag",
+                uploaded: true
             };
         }
     };
@@ -288,6 +289,29 @@ test("permintaan PDF membalas tunggu lalu kirim dokumen", async () => {
     assert.equal(documents[0].filename, "RT 12OKT26.pdf");
     assert.match(documents[0].caption, /tahun 2026/);
     assert.match(documents[0].caption, /RT 12OKT26\.pdf/);
+});
+
+test("PDF tetap dikirim ke WhatsApp kalau upload SharePoint belum diizinkan", async () => {
+    const documents = [];
+    const dependencies = {
+        ...createDependencies(),
+        aiAssistant: { ask: async () => ({ action: "exportPdf", jenis: "redTag", tahun: null }) },
+        sendDocument: async (_message, doc) => documents.push(doc),
+        exportReport: async () => ({
+            filename: "RT 12OKT26.pdf",
+            pdf: Buffer.from("pdf"),
+            year: "2026",
+            folderLabel: "Tag",
+            folderUrl: "https://example/tag",
+            uploaded: false
+        })
+    };
+
+    const status = await processMessage(createMessage({ messageText: "@bot buatkan pdf template RT" }), dependencies);
+
+    assert.equal(status, "PROCESSED");
+    assert.equal(documents[0].filename, "RT 12OKT26.pdf");
+    assert.match(documents[0].caption, /izin IT/);
 });
 
 test("gagal membuat PDF dibalas pesan error", async () => {
