@@ -28,9 +28,9 @@ const SHEET_COLUMNS = {
 
 // Kolom detail untuk AI, nama field disamakan supaya satu fungsi cari cukup
 const DETAIL_COLUMNS = {
-    redTag: { noTag: "B", tahun: "C", tanggal: "D", equipment: "F", ditemukanOleh: "G", kategori: "I", deskripsi: "J", line: "K", pic: "L", diselesaikanOleh: "M", tglClose: "N", status: "O", penanggulangan: "P", bulan: "R", bulanClose: "S" },
-    orangeTag: { tanggal: "C", noTag: "D", deskripsi: "E", equipment: "F", ditemukanOleh: "G", kategori: "H", penanggulangan: "I", diselesaikanOleh: "J", tglClose: "K", status: "L", department: "M", line: "N", tahun: "O", bulan: "P", bulanClose: "R" },
-    workRequest: { tahun: "A", noTag: "B", deskripsi: "C", department: "D", tanggal: "F", pic: "G", tglClose: "I", status: "J", diselesaikanOleh: "K", penanggulangan: "L", kategori: "M" }
+    redTag: { no: "A", noTag: "B", tahun: "C", tanggal: "D", equipment: "F", ditemukanOleh: "G", kategori: "I", deskripsi: "J", line: "K", pic: "L", diselesaikanOleh: "M", tglClose: "N", status: "O", penanggulangan: "P", bulan: "R", bulanClose: "S" },
+    orangeTag: { no: "A", tanggal: "C", noTag: "D", deskripsi: "E", equipment: "F", ditemukanOleh: "G", kategori: "H", penanggulangan: "I", diselesaikanOleh: "J", tglClose: "K", status: "L", department: "M", line: "N", tahun: "O", bulan: "P", bulanClose: "R" },
+    workRequest: { tahun: "A", noTag: "B", deskripsi: "C", department: "D", keterangan: "E", tanggal: "F", pic: "G", tglClose: "I", status: "J", diselesaikanOleh: "K", penanggulangan: "L", kategori: "M" }
 };
 
 const columnIndex = (column) => column.charCodeAt(0) - 65;
