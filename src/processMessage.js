@@ -1,7 +1,7 @@
 import { buildAiUnavailableMessage, buildClosedResult, buildMissingFieldsResult, buildNotTechnicianMessage, buildRedTagSummaryMessage, RED_TAG_RESULT } from "./acknowledgementMessages.js";
 import { CLOSE_DATE_LABEL, PROCESSING_STATUS, SHEET_TYPES, STATUS_LABEL } from "./constants.js";
 import { extractField, splitByField } from "./extractField.js";
-import { buildDoneMessage, buildPdfFailedMessage, buildWaitingMessage } from "./exportReport.js";
+import { buildDoneMessage, buildPdfFailedMessage, buildPendingUploadMessage, buildWaitingMessage } from "./exportReport.js";
 import { isSameTag } from "./googleSheetsRepository.js";
 import { logger } from "./logger.js";
 
@@ -92,7 +92,8 @@ async function exportPdfForUser(message, { jenis, tahun }, { sendReply, sendTypi
 
     try {
         const result = await exportReport({ type: jenis, requestedYear: tahun, receivedAt: message.receivedAt });
-        await sendDocument(message, { filename: result.filename, buffer: result.pdf, caption: buildDoneMessage(result) });
+        const caption = result.uploaded === false ? buildPendingUploadMessage(result) : buildDoneMessage(result);
+        await sendDocument(message, { filename: result.filename, buffer: result.pdf, caption });
         logger.info(`PDF ${result.filename} dikirim, messageId=${message.messageId}`);
         return PROCESSING_STATUS.PROCESSED;
     } catch (error) {
