@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ASIA_JAKARTA } from "./constants.js";
 import { logger } from "./logger.js";
+import { matchesFilter } from "./redTagSearch.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MSAL_CACHE = path.join(ROOT, "auth_info", "msal-cache.json");
@@ -35,7 +36,7 @@ export const REPORT_TYPES = {
         folderKey: "tag",
         folderLabel: "Tag",
         folderPath: "Data Sanghiang/Ops Adm/Template/Tag",
-        header: (year, dateText) => `&C&"-,Bold"&48&K002060RED TAG ${year}&R&26 ${dateText}`
+        header: (year) => `&C&"-,Bold"&48&K002060RED TAG ${year}`
     },
     orangeTag: {
         prefix: "OT",
@@ -46,10 +47,7 @@ export const REPORT_TYPES = {
         folderKey: "tag",
         folderLabel: "Tag",
         folderPath: "Data Sanghiang/Ops Adm/Template/Tag",
-        header: (year, dateText) => {
-            const [day, monthName, updateYear] = dateText.split(" ");
-            return `&C&"-,Bold"&48&K002060ORANGE TAG ${year}&R&"-,Bold"&36 ${day} ${monthName}&K002060 ${updateYear}`;
-        }
+        header: (year) => `&C&"-,Bold"&48&K002060ORANGE TAG ${year}`
     },
     workRequest: {
         prefix: "WR",
@@ -60,7 +58,7 @@ export const REPORT_TYPES = {
         folderKey: "wr",
         folderLabel: "WR",
         folderPath: "Data Sanghiang/Ops Adm/Template/WR",
-        header: (_year, dateText) => `&C&28WR PRINT ${dateText}`
+        header: () => `&C&28WR PRINT`
     }
 };
 
@@ -95,11 +93,13 @@ export function headerDate(receivedAt) {
     return `${day} ${MONTHS_HEADER[month - 1]} ${year}`;
 }
 
-// Saring baris Open sesuai tahun
-export function filterOpenRows(rows, year) {
+// Saring baris Open sesuai tahun dan filter permintaan user
+export function filterOpenRows(rows, year, filters = {}) {
+    const activeFilters = Object.entries(filters).filter(([, value]) => value !== undefined && String(value).trim() !== "");
     return rows.filter((row) =>
         String(row.status ?? "").trim().toLowerCase() === "open"
         && String(row.tahun ?? "").trim() === String(year)
+        && activeFilters.every(([field, value]) => matchesFilter(row, field, value))
     );
 }
 
@@ -110,7 +110,7 @@ export function mapTemplateRow(type, row) {
 
 // Pesan tunggu saat PDF dibuat
 export function buildWaitingMessage() {
-    return "siap tuan saya akan buatkan, tolong tunggu ya";
+    return "Siap, saya buatkan dulu ya";
 }
 
 // Pesan selesai setelah PDF dikirim
@@ -200,19 +200,28 @@ export async function fillTemplate(type, rows, { year, receivedAt }) {
 
     rows.forEach((row, index) => {
         const dest = sheet.getRow(index + 2);
-        dest.height = sampleHeight;
+        dest.height = Math.max(sampleHeight || 0, 27);
         mapTemplateRow(type, row).forEach((value, colIndex) => {
             const cell = dest.getCell(colIndex + 1);
             if (styleCells[colIndex + 1]) {
                 applyStyle(styleCells[colIndex + 1], cell);
             }
+            cell.font = { ...(cell.font || {}), size: 20 };
             cell.value = cellValue(value);
         });
         dest.commit();
     });
 
-    const lastRow = Math.max(rows.length + 1, 1);
-    sheet.headerFooter.oddHeader = report.header(year, headerDate(receivedAt));
+    sheet.spliceRows(1, 0, []);
+    const dateCol = report.fields.indexOf("tglClose") + 1;
+    const dateCell = sheet.getRow(1).getCell(dateCol > 0 ? dateCol : 1);
+    dateCell.value = headerDate(receivedAt);
+    dateCell.font = { size: 20, bold: true };
+    dateCell.alignment = { horizontal: "right", vertical: "middle" };
+    sheet.getRow(1).height = 27;
+
+    const lastRow = Math.max(rows.length + 2, 2);
+    sheet.headerFooter.oddHeader = report.header(year);
     sheet.pageSetup.paperSize = 9;
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
@@ -368,11 +377,12 @@ export async function exportPdfReport({
     fill = fillTemplate,
     convertXlsxToPdf: convertPdf = convertXlsxToPdf,
     uploadPdf,
-    folderUrls = DEFAULT_LINKS
+    folderUrls = DEFAULT_LINKS,
+    filters = {}
 }) {
     const report = REPORT_TYPES[type];
     const year = reportYear(receivedAt, requestedYear);
-    const rows = filterOpenRows(await listDetails(type), year);
+    const rows = filterOpenRows(await listDetails(type), year, filters);
     const xlsx = await fill(type, rows, { year, receivedAt });
     const filename = buildFileName(report.prefix, receivedAt);
     const pdf = await convertPdf(xlsx, filename);
@@ -399,10 +409,11 @@ export async function exportPdfReport({
 
 // Hubungkan ekspor PDF ke dashboard, LibreOffice, dan SharePoint
 export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS }) {
-    return ({ type, requestedYear, receivedAt }) => exportPdfReport({
+    return ({ type, requestedYear, receivedAt, filters }) => exportPdfReport({
         type,
         requestedYear,
         receivedAt,
+        filters,
         listDetails: (sheetType) => redTagRepository.listDetails(sheetType),
         convertXlsxToPdf,
         uploadPdf: (payload) => uploadPdfToSharePoint(payload, { clientId, site }),
