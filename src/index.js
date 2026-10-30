@@ -16,7 +16,8 @@ async function main() {
         redTagRepository,
         clientId: config.microsoftClientId,
         site: config.sharePointSite,
-        folderUrls: config.sharePointLinks
+        folderUrls: config.sharePointLinks,
+        driveFolderId: config.googleDrivePdfFolderId
     });
 
     if (config.allowedGroupIds.length === 0) {
