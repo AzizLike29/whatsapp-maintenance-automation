@@ -8,7 +8,7 @@ const MAX_ROWS = 20;
 const closeYear = (redTag) => String(redTag.tglClose ?? "").match(/\d{4}/)?.[0] ?? "";
 
 // Cek satu filter, huruf besar kecil diabaikan
-function matchesFilter(redTag, field, value) {
+export function matchesFilter(redTag, field, value) {
     const input = String(value).trim().toLowerCase();
 
     if (field === "noTag") {
