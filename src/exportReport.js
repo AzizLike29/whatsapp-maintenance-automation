@@ -14,8 +14,8 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 const MONTHS_FILE = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGS", "SEP", "OKT", "NOV", "DES"];
 const MONTHS_HEADER = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
 const SCOPES = ["Files.ReadWrite.All", "offline_access"];
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
-const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true";
 const DRIVE_FILES = "https://www.googleapis.com/drive/v3/files";
 const DEFAULT_SITE = "onekn-my.sharepoint.com:/personal/nila_agustina_kalbenutritionals_com";
 const DEFAULT_LINKS = {
@@ -278,17 +278,28 @@ async function graphPut(url, body, contentType, token) {
     return response;
 }
 
+// Metadata upload Drive ke folder bersama, bukan My Drive service account
+export function driveConvertMetadata(filename, folderId) {
+    const id = String(folderId ?? "").trim();
+    if (!id) {
+        throw new Error("GOOGLE_DRIVE_PDF_FOLDER_ID belum diisi");
+    }
+
+    return {
+        name: filename.replace(/\.pdf$/i, ".xlsx"),
+        mimeType: "application/vnd.google-apps.spreadsheet",
+        parents: [id]
+    };
+}
+
 // Ubah Excel jadi PDF lewat Google Drive
-export async function convertXlsxToPdf(xlsx, filename) {
+export async function convertXlsxToPdf(xlsx, filename, folderId) {
     const googleAuth = new auth.GoogleAuth({ scopes: [DRIVE_SCOPE] });
     const client = await googleAuth.getClient();
     const access = await client.getAccessToken();
     const token = access?.token || access;
     const boundary = "botpdf";
-    const metadata = JSON.stringify({
-        name: filename.replace(/\.pdf$/i, ".xlsx"),
-        mimeType: "application/vnd.google-apps.spreadsheet"
-    });
+    const metadata = JSON.stringify(driveConvertMetadata(filename, folderId));
     const body = Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
         Buffer.from(`--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`),
@@ -307,15 +318,15 @@ export async function convertXlsxToPdf(xlsx, filename) {
         throw new Error(`Drive upload ${upload.status}: ${await upload.text()}`);
     }
     const file = await upload.json();
-    const pdfResponse = await fetch(`${DRIVE_FILES}/${file.id}/export?mimeType=application/pdf`, {
+    const pdfResponse = await fetch(`${DRIVE_FILES}/${file.id}/export?mimeType=application/pdf&supportsAllDrives=true`, {
         headers: { Authorization: `Bearer ${token}` }
     });
     if (!pdfResponse.ok) {
-        await fetch(`${DRIVE_FILES}/${file.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+        await fetch(`${DRIVE_FILES}/${file.id}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
         throw new Error(`Drive PDF ${pdfResponse.status}: ${await pdfResponse.text()}`);
     }
     const pdf = Buffer.from(await pdfResponse.arrayBuffer());
-    await fetch(`${DRIVE_FILES}/${file.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${DRIVE_FILES}/${file.id}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     return pdf;
 }
 
@@ -371,13 +382,13 @@ export async function exportPdfReport({
 }
 
 // Hubungkan ekspor PDF ke dashboard, Google Drive, dan SharePoint
-export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS }) {
+export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS, driveFolderId }) {
     return ({ type, requestedYear, receivedAt }) => exportPdfReport({
         type,
         requestedYear,
         receivedAt,
         listDetails: (sheetType) => redTagRepository.listDetails(sheetType),
-        convertXlsxToPdf,
+        convertXlsxToPdf: (xlsx, filename) => convertXlsxToPdf(xlsx, filename, driveFolderId),
         uploadPdf: (payload) => uploadPdfToSharePoint(payload, { clientId, site }),
         folderUrls
     });
