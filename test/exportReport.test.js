@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import ExcelJS from "exceljs";
-import { buildDoneMessage, buildFileName, buildPendingUploadMessage, buildWaitingMessage, exportPdfReport, fillTemplate, filterOpenRows, mapTemplateRow, reportYear } from "../src/exportReport.js";
+import { buildDoneMessage, buildFileName, buildPendingUploadMessage, buildWaitingMessage, driveConvertMetadata, exportPdfReport, fillTemplate, filterOpenRows, mapTemplateRow, reportYear } from "../src/exportReport.js";
 
 const RECEIVED_AT = "2026-10-30T09:31:00+07:00";
 
@@ -107,6 +107,13 @@ test("pesan pending menyebut PDF sudah dikirim dan menunggu izin IT", () => {
     assert.match(pending, /tahun 2026/);
     assert.match(pending, /RT 30OKT26\.pdf/);
     assert.match(pending, /izin IT/);
+});
+
+test("upload Drive memakai folder bersama, bukan My Drive service account", () => {
+    const meta = driveConvertMetadata("RT 30OKT26.pdf", "1ha1vrawNbKb7ie5jp7aOsDGCBIcz9Qok");
+    assert.deepEqual(meta.parents, ["1ha1vrawNbKb7ie5jp7aOsDGCBIcz9Qok"]);
+    assert.equal(meta.name, "RT 30OKT26.xlsx");
+    assert.throws(() => driveConvertMetadata("RT 30OKT26.pdf", ""), /GOOGLE_DRIVE_PDF_FOLDER_ID/);
 });
 
 test("PDF tetap jadi walau upload SharePoint gagal", async () => {
