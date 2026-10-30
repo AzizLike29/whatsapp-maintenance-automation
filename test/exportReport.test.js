@@ -45,6 +45,16 @@ test("hanya baris Open di tahun yang diminta, urutan atas ke bawah tetap", () =>
     assert.deepEqual(filterOpenRows(rows, "2026").map((row) => row.noTag), ["open-a", "open-b"]);
 });
 
+test("filter PIC mengabaikan huruf besar kecil", () => {
+    const rows = [
+        { ...OPEN_RT, noTag: "jsu-a", pic: "JSU" },
+        { ...OPEN_RT, noTag: "dan", pic: "DAN" },
+        { ...OPEN_RT, noTag: "jsu-b", pic: "jsu" }
+    ];
+
+    assert.deepEqual(filterOpenRows(rows, "2026", { pic: "JSU" }).map((row) => row.noTag), ["jsu-a", "jsu-b"]);
+});
+
 test("mapping kolom RT, OT, dan WR sesuai template Excel", () => {
     assert.deepEqual(mapTemplateRow("redTag", OPEN_RT), [
         "2238", "RT/LINEG1/03/2026/02475", "2026", "MC.LANGEN", "SURYANI", "Cover buram", "G1", "DAN", "", ""
@@ -83,7 +93,7 @@ test("mapping kolom RT, OT, dan WR sesuai template Excel", () => {
 });
 
 test("pesan tunggu dan selesai menyebut tahun, nama file, dan link folder", () => {
-    assert.equal(buildWaitingMessage(), "siap tuan saya akan buatkan, tolong tunggu ya");
+    assert.equal(buildWaitingMessage(), "Siap, saya buatkan dulu ya");
 
     const done = buildDoneMessage({
         year: "2026",
@@ -122,6 +132,26 @@ test("LibreOffice mengubah Excel jadi PDF", { skip: !existsSync(SOFFICE) || !exi
     assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
 });
 
+test("PDF PIC hanya mengisi baris PIC yang diminta", async () => {
+    let filled = [];
+    await exportPdfReport({
+        type: "redTag",
+        receivedAt: RECEIVED_AT,
+        listDetails: async () => [
+            { ...OPEN_RT, noTag: "jsu", pic: "JSU" },
+            { ...OPEN_RT, noTag: "dan", pic: "DAN" }
+        ],
+        fill: async (_type, rows) => {
+            filled = rows;
+            return Buffer.from("xlsx");
+        },
+        convertXlsxToPdf: async () => Buffer.from("pdf"),
+        filters: { pic: "JSU" }
+    });
+
+    assert.deepEqual(filled.map((row) => row.noTag), ["jsu"]);
+});
+
 test("PDF tetap jadi walau upload SharePoint gagal", async () => {
     const result = await exportPdfReport({
         type: "redTag",
@@ -145,9 +175,11 @@ test("isi template RT tanpa menimpa file asli, header dan data ikut terisi", { s
     await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("RT");
 
-    assert.equal(String(sheet.getCell("B2").value), OPEN_RT.noTag);
+    assert.equal(String(sheet.getCell("J1").value), "30 Okt 2026");
+    assert.equal(String(sheet.getCell("B3").value), OPEN_RT.noTag);
+    assert.equal(sheet.getCell("B3").font?.size, 20);
     assert.match(sheet.headerFooter.oddHeader ?? "", /RED TAG 2026/);
-    assert.match(sheet.headerFooter.oddHeader ?? "", /30 Okt 2026/);
+    assert.doesNotMatch(sheet.headerFooter.oddHeader ?? "", /30 Okt/);
     assert.equal(sheet.pageSetup.paperSize, 9);
     assert.equal(workbook.getWorksheet("OT").state, "hidden");
 });
