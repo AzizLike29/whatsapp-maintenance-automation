@@ -13,9 +13,11 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@azure/msal-node": "^7.1.2",
     "@google/genai": "^2.29.1",
     "@googleapis/sheets": "^18.0.1",
     "baileys": "^7.0.0-rc14",
+    "exceljs": "^4.4.0",
     "qrcode-terminal": "^0.12.0"
   }
 }
