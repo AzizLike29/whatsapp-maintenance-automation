@@ -86,12 +86,12 @@ async function processBlock({ type, text }, tags, { message, redTagRepository })
 }
 
 // Kirim PDF ke WhatsApp dan unggah ke SharePoint
-async function exportPdfForUser(message, { jenis, tahun }, { sendReply, sendTyping, sendDocument, exportReport }) {
+async function exportPdfForUser(message, { jenis, tahun, filters }, { sendReply, sendTyping, sendDocument, exportReport }) {
     await sendReply(message, buildWaitingMessage());
     await sendTyping?.(message);
 
     try {
-        const result = await exportReport({ type: jenis, requestedYear: tahun, receivedAt: message.receivedAt });
+        const result = await exportReport({ type: jenis, requestedYear: tahun, receivedAt: message.receivedAt, filters });
         const caption = result.uploaded === false ? buildPendingUploadMessage(result) : buildDoneMessage(result);
         await sendDocument(message, { filename: result.filename, buffer: result.pdf, caption });
         logger.info(`PDF ${result.filename} dikirim, messageId=${message.messageId}`);
