@@ -1,6 +1,7 @@
 import { buildAiUnavailableMessage, buildClosedResult, buildMissingFieldsResult, buildNotTechnicianMessage, buildRedTagSummaryMessage, RED_TAG_RESULT } from "./acknowledgementMessages.js";
 import { CLOSE_DATE_LABEL, PROCESSING_STATUS, SHEET_TYPES, STATUS_LABEL } from "./constants.js";
 import { extractField, splitByField } from "./extractField.js";
+import { buildDoneMessage, buildPdfFailedMessage, buildWaitingMessage } from "./exportReport.js";
 import { isSameTag } from "./googleSheetsRepository.js";
 import { logger } from "./logger.js";
 
@@ -84,12 +85,34 @@ async function processBlock({ type, text }, tags, { message, redTagRepository })
     }
 }
 
-// Jawab pertanyaan bebas dengan AI, mention bot dibuang dari pertanyaan
-async function answerQuestion(message, { aiAssistant, sendReply }) {
+// Kirim PDF ke WhatsApp dan unggah ke SharePoint
+async function exportPdfForUser(message, { jenis, tahun }, { sendReply, sendTyping, sendDocument, exportReport }) {
+    await sendReply(message, buildWaitingMessage());
+    await sendTyping?.(message);
+
+    try {
+        const result = await exportReport({ type: jenis, requestedYear: tahun, receivedAt: message.receivedAt });
+        await sendDocument(message, { filename: result.filename, buffer: result.pdf, caption: buildDoneMessage(result) });
+        logger.info(`PDF ${result.filename} dikirim, messageId=${message.messageId}`);
+        return PROCESSING_STATUS.PROCESSED;
+    } catch (error) {
+        logger.error(`Gagal membuat PDF, messageId=${message.messageId}: ${error.message}`);
+        await sendReply(message, buildPdfFailedMessage());
+        return PROCESSING_STATUS.ERROR;
+    }
+}
+
+// Jawab pertanyaan lewat AI atau ekspor PDF
+async function answerQuestion(message, { aiAssistant, sendReply, sendTyping, sendDocument, exportReport }) {
     const question = message.messageText.replace(/@\d+/g, "").trim();
 
     try {
         const answer = await aiAssistant.ask(question, message.receivedAt);
+
+        if (answer?.action === "exportPdf") {
+            return await exportPdfForUser(message, answer, { sendReply, sendTyping, sendDocument, exportReport });
+        }
+
         await sendReply(message, answer ?? buildAiUnavailableMessage());
         return answer ? PROCESSING_STATUS.PROCESSED : PROCESSING_STATUS.ERROR;
     } catch (error) {
@@ -100,7 +123,7 @@ async function answerQuestion(message, { aiAssistant, sendReply }) {
 }
 
 // Proses pesan grup
-export async function processMessage(message, { allowedGroupIds, redTagRepository, aiAssistant, botJids, sendReply }) {
+export async function processMessage(message, { allowedGroupIds, redTagRepository, aiAssistant, botJids, sendReply, sendTyping, sendDocument, exportReport }) {
     const { messageId, groupId, senderName, senderPhone, messageText } = message;
 
     if (!allowedGroupIds.includes(groupId)) {
@@ -127,7 +150,7 @@ export async function processMessage(message, { allowedGroupIds, redTagRepositor
         }
 
         if (isQuestion) {
-            return await answerQuestion(message, { aiAssistant, sendReply });
+            return await answerQuestion(message, { aiAssistant, sendReply, sendTyping, sendDocument, exportReport });
         }
 
         const tagsByType = {};
