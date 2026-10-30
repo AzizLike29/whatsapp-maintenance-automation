@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import ExcelJS from "exceljs";
-import { buildDoneMessage, buildFileName, buildWaitingMessage, fillTemplate, filterOpenRows, mapTemplateRow, reportYear } from "../src/exportReport.js";
+import { buildDoneMessage, buildFileName, buildPendingUploadMessage, buildWaitingMessage, exportPdfReport, fillTemplate, filterOpenRows, mapTemplateRow, reportYear } from "../src/exportReport.js";
 
 const RECEIVED_AT = "2026-10-30T09:31:00+07:00";
 
@@ -94,7 +97,38 @@ test("pesan tunggu dan selesai menyebut tahun, nama file, dan link folder", () =
     assert.match(done, /https:\/\/sharepoint\.example\/tag/);
 });
 
-test("isi template RT tanpa menimpa file asli, header dan data ikut terisi", async () => {
+test("pesan pending menyebut PDF sudah dikirim dan menunggu izin IT", () => {
+    const pending = buildPendingUploadMessage({
+        year: "2026",
+        filename: "RT 30OKT26.pdf",
+        folderLabel: "Tag",
+        folderUrl: "https://sharepoint.example/tag"
+    });
+    assert.match(pending, /tahun 2026/);
+    assert.match(pending, /RT 30OKT26\.pdf/);
+    assert.match(pending, /izin IT/);
+});
+
+test("PDF tetap jadi walau upload SharePoint gagal", async () => {
+    const result = await exportPdfReport({
+        type: "redTag",
+        receivedAt: RECEIVED_AT,
+        listDetails: async () => [OPEN_RT],
+        fill: async () => Buffer.from("xlsx"),
+        convertXlsxToPdf: async () => Buffer.from("pdf-bytes"),
+        uploadPdf: async () => {
+            throw new Error("AADSTS65001");
+        }
+    });
+
+    assert.equal(result.uploaded, false);
+    assert.equal(result.filename, "RT 30OKT26.pdf");
+    assert.equal(result.pdf.toString(), "pdf-bytes");
+});
+
+const TEMPLATE_RT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "Eksekusi PDF", "RT & OT", "Template Tag.xlsx");
+
+test("isi template RT tanpa menimpa file asli, header dan data ikut terisi", { skip: !existsSync(TEMPLATE_RT) }, async () => {
     const buffer = await fillTemplate("redTag", [OPEN_RT], { year: "2026", receivedAt: RECEIVED_AT });
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
