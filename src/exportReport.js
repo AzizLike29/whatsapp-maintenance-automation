@@ -1,10 +1,11 @@
 import { PublicClientApplication } from "@azure/msal-node";
-import { auth } from "@googleapis/sheets";
 import ExcelJS from "exceljs";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { ASIA_JAKARTA } from "./constants.js";
 import { logger } from "./logger.js";
 
@@ -14,9 +15,10 @@ const GRAPH = "https://graph.microsoft.com/v1.0";
 const MONTHS_FILE = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGS", "SEP", "OKT", "NOV", "DES"];
 const MONTHS_HEADER = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
 const SCOPES = ["Files.ReadWrite.All", "offline_access"];
-const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
-const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true";
-const DRIVE_FILES = "https://www.googleapis.com/drive/v3/files";
+const SOFFICE_CANDIDATES = [
+    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+    "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe"
+];
 const DEFAULT_SITE = "onekn-my.sharepoint.com:/personal/nila_agustina_kalbenutritionals_com";
 const DEFAULT_LINKS = {
     wr: "https://onekn-my.sharepoint.com/shared?id=%2Fpersonal%2Fnila%5Fagustina%5Fkalbenutritionals%5Fcom%2FDocuments%2FData%20Sanghiang%2FOps%20Adm%2FTemplate%2FWR",
@@ -278,56 +280,70 @@ async function graphPut(url, body, contentType, token) {
     return response;
 }
 
-// Metadata upload Drive ke folder bersama, bukan My Drive service account
-export function driveConvertMetadata(filename, folderId) {
-    const id = String(folderId ?? "").trim();
-    if (!id) {
-        throw new Error("GOOGLE_DRIVE_PDF_FOLDER_ID belum diisi");
+// Cari soffice di lokasi default Windows
+export function resolveSofficePath(candidates = SOFFICE_CANDIDATES) {
+    const found = candidates.find((candidate) => existsSync(candidate));
+    if (!found) {
+        throw new Error("LibreOffice belum terpasang");
     }
-
-    return {
-        name: filename.replace(/\.pdf$/i, ".xlsx"),
-        mimeType: "application/vnd.google-apps.spreadsheet",
-        parents: [id]
-    };
+    return found;
 }
 
-// Ubah Excel jadi PDF lewat Google Drive
-export async function convertXlsxToPdf(xlsx, filename, folderId) {
-    const googleAuth = new auth.GoogleAuth({ scopes: [DRIVE_SCOPE] });
-    const client = await googleAuth.getClient();
-    const access = await client.getAccessToken();
-    const token = access?.token || access;
-    const boundary = "botpdf";
-    const metadata = JSON.stringify(driveConvertMetadata(filename, folderId));
-    const body = Buffer.concat([
-        Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
-        Buffer.from(`--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`),
-        Buffer.isBuffer(xlsx) ? xlsx : Buffer.from(xlsx),
-        Buffer.from(`\r\n--${boundary}--`)
-    ]);
-    const upload = await fetch(DRIVE_UPLOAD, {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": `multipart/related; boundary=${boundary}`
-        },
-        body
+// Jalankan LibreOffice headless untuk convert PDF
+function runSoffice(soffice, dir, xlsxPath, profile) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(soffice, [
+            `-env:UserInstallation=${pathToFileURL(profile).href}`,
+            "--headless",
+            "--norestore",
+            "--nologo",
+            "--nolockcheck",
+            "--convert-to",
+            "pdf:calc_pdf_Export",
+            "--outdir",
+            dir,
+            xlsxPath
+        ], { windowsHide: true });
+        let stderr = "";
+        child.stderr.on("data", (chunk) => {
+            stderr += chunk;
+        });
+        const timer = setTimeout(() => {
+            child.kill();
+            reject(new Error("LibreOffice timeout"));
+        }, 60000);
+        child.on("error", (error) => {
+            clearTimeout(timer);
+            reject(error);
+        });
+        child.on("close", (code) => {
+            clearTimeout(timer);
+            if (code === 0) {
+                resolve();
+                return;
+            }
+            reject(new Error(`LibreOffice ${code}: ${stderr}`.trim()));
+        });
     });
-    if (!upload.ok) {
-        throw new Error(`Drive upload ${upload.status}: ${await upload.text()}`);
+}
+
+// Ubah Excel jadi PDF lewat LibreOffice
+export async function convertXlsxToPdf(xlsx, filename) {
+    const soffice = resolveSofficePath();
+    const dir = await mkdtemp(path.join(os.tmpdir(), "bot-pdf-"));
+    const xlsxPath = path.join(dir, filename.replace(/\.pdf$/i, ".xlsx"));
+    const pdfPath = path.join(dir, filename.replace(/\.pdf$/i, ".pdf"));
+
+    try {
+        await writeFile(xlsxPath, xlsx);
+        await runSoffice(soffice, dir, xlsxPath, path.join(dir, "lo-profile"));
+        if (!existsSync(pdfPath)) {
+            throw new Error("LibreOffice tidak menghasilkan PDF");
+        }
+        return await readFile(pdfPath);
+    } finally {
+        await rm(dir, { recursive: true, force: true });
     }
-    const file = await upload.json();
-    const pdfResponse = await fetch(`${DRIVE_FILES}/${file.id}/export?mimeType=application/pdf&supportsAllDrives=true`, {
-        headers: { Authorization: `Bearer ${token}` }
-    });
-    if (!pdfResponse.ok) {
-        await fetch(`${DRIVE_FILES}/${file.id}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-        throw new Error(`Drive PDF ${pdfResponse.status}: ${await pdfResponse.text()}`);
-    }
-    const pdf = Buffer.from(await pdfResponse.arrayBuffer());
-    await fetch(`${DRIVE_FILES}/${file.id}?supportsAllDrives=true`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    return pdf;
 }
 
 // Unggah PDF ke folder SharePoint kalau token Microsoft sudah ada
@@ -381,14 +397,14 @@ export async function exportPdfReport({
     };
 }
 
-// Hubungkan ekspor PDF ke dashboard, Google Drive, dan SharePoint
-export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS, driveFolderId }) {
+// Hubungkan ekspor PDF ke dashboard, LibreOffice, dan SharePoint
+export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS }) {
     return ({ type, requestedYear, receivedAt }) => exportPdfReport({
         type,
         requestedYear,
         receivedAt,
         listDetails: (sheetType) => redTagRepository.listDetails(sheetType),
-        convertXlsxToPdf: (xlsx, filename) => convertXlsxToPdf(xlsx, filename, driveFolderId),
+        convertXlsxToPdf,
         uploadPdf: (payload) => uploadPdfToSharePoint(payload, { clientId, site }),
         folderUrls
     });
