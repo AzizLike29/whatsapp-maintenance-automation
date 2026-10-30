@@ -32,6 +32,13 @@ export function loadConfig(env = process.env) {
         technicianSheetName: env.TECHNICIAN_SHEET_NAME.trim(),
         geminiApiKey: env.GEMINI_API_KEY?.trim() || null,
         geminiModel: env.GEMINI_MODEL?.trim() || "gemini-flash-lite-latest",
-        whatsAppPhoneNumber
+        whatsAppPhoneNumber,
+        // Pakai client Graph PowerShell, ganti MICROSOFT_CLIENT_ID kalau tenant menolak
+        microsoftClientId: env.MICROSOFT_CLIENT_ID?.trim() || "14d82eec-204b-4c2f-b7e8-296a70dab67e",
+        sharePointSite: env.SHAREPOINT_SITE?.trim() || "onekn-my.sharepoint.com:/personal/nila_agustina_kalbenutritionals_com",
+        sharePointLinks: {
+            wr: env.SHAREPOINT_WR_LINK?.trim() || "https://onekn-my.sharepoint.com/shared?id=%2Fpersonal%2Fnila%5Fagustina%5Fkalbenutritionals%5Fcom%2FDocuments%2FData%20Sanghiang%2FOps%20Adm%2FTemplate%2FWR",
+            tag: env.SHAREPOINT_TAG_LINK?.trim() || "https://onekn-my.sharepoint.com/shared?id=%2Fpersonal%2Fnila%5Fagustina%5Fkalbenutritionals%5Fcom%2FDocuments%2FData%20Sanghiang%2FOps%20Adm%2FTemplate%2FTag"
+        }
     };
 }
