@@ -24,7 +24,10 @@ const SYSTEM_INSTRUCTION = [
     "Reopen:",
     "No RT: 24308",
     "Status: Open",
-    "Untuk Orange Tag ganti No OT, untuk WR ganti No WR"
+    "Untuk Orange Tag ganti No OT, untuk WR ganti No WR",
+    "Kalau user minta buatkan PDF atau pakai template RT, OT, Red Tag, Orange Tag, atau WR, panggil buatLaporanPdf, jangan cariDashboardMaintenance",
+    "jenis redTag untuk RT, orangeTag untuk OT, workRequest untuk WR",
+    "tahun hanya diisi kalau user menyebut tahun, kalau tidak kosongkan"
 ].join("\n");
 
 const text = (description) => ({ type: Type.STRING, description });
@@ -65,16 +68,33 @@ const SEARCH_DECLARATION = {
     }
 };
 
+const EXPORT_DECLARATION = {
+    name: "buatLaporanPdf",
+    description: "Buat PDF data Open dari dashboard memakai template RT, OT, atau WR, kirim ke WhatsApp, dan upload ke SharePoint",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            jenis: {
+                type: Type.STRING,
+                enum: Object.keys(SHEET_TYPES),
+                description: "redTag untuk Red Tag, orangeTag untuk Orange Tag, workRequest untuk Work Request"
+            },
+            tahun: text("Tahun data hanya jika user menyebut, contoh 2026")
+        },
+        required: ["jenis"]
+    }
+};
+
 // Asisten AI yang hanya membaca data Red Tag, Orange Tag, dan WR
 export function createAiAssistant({ apiKey, model, redTagRepository }) {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Jawab pertanyaan, null kalau AI tidak memberi jawaban
+    // Jawab pertanyaan user
     async function ask(question, receivedAt) {
         const contents = [{ role: "user", parts: [{ text: question }] }];
         const config = {
             systemInstruction: `${SYSTEM_INSTRUCTION}\nHari ini ${receivedAt.slice(0, 10)}`,
-            tools: [{ functionDeclarations: [SEARCH_DECLARATION] }]
+            tools: [{ functionDeclarations: [SEARCH_DECLARATION, EXPORT_DECLARATION] }]
         };
         const detailsByType = {};
 
@@ -86,10 +106,22 @@ export function createAiAssistant({ apiKey, model, redTagRepository }) {
                 return response.text?.trim() || null;
             }
 
+            const pdfCall = calls.find((call) => call.name === "buatLaporanPdf");
+            if (pdfCall) {
+                const jenis = SHEET_TYPES[pdfCall.args?.jenis] ? pdfCall.args.jenis : null;
+                if (jenis) {
+                    return { action: "exportPdf", jenis, tahun: pdfCall.args?.tahun?.trim() || null };
+                }
+            }
+
             const parts = [];
 
             // Tiap sheet dibaca sekali per pertanyaan
             for (const { name, args } of calls) {
+                if (name === "buatLaporanPdf") {
+                    parts.push({ functionResponse: { name, response: { error: "jenis wajib redTag, orangeTag, atau workRequest" } } });
+                    continue;
+                }
                 const { jenis, ...filters } = args ?? {};
                 const type = SHEET_TYPES[jenis] ? jenis : "redTag";
                 detailsByType[type] ??= await redTagRepository.listDetails(type);
