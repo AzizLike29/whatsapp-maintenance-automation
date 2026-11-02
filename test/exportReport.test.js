@@ -175,11 +175,46 @@ test("isi template RT tanpa menimpa file asli, header dan data ikut terisi", { s
     await workbook.xlsx.load(buffer);
     const sheet = workbook.getWorksheet("RT");
 
-    assert.equal(String(sheet.getCell("J1").value), "30 Okt 2026");
-    assert.equal(String(sheet.getCell("B3").value), OPEN_RT.noTag);
-    assert.equal(sheet.getCell("B3").font?.size, 20);
-    assert.match(sheet.headerFooter.oddHeader ?? "", /RED TAG 2026/);
-    assert.doesNotMatch(sheet.headerFooter.oddHeader ?? "", /30 Okt/);
+    assert.match(String(sheet.getCell("J1").value), /Tgl Close/i);
+    assert.equal(sheet.getCell("C1").value, "Tahun");
+    assert.equal(sheet.getCell("I1").value, "Diselesaikan\nOleh");
+    assert.equal(sheet.getCell("A1").alignment?.horizontal, "center");
+    assert.equal(sheet.getCell("I1").alignment?.horizontal, "center");
+    assert.ok(sheet.getColumn("H").width < 15);
+    assert.ok(sheet.getColumn("C").width >= 15);
+    assert.ok(sheet.getColumn("I").width >= 30);
+    assert.equal(String(sheet.getCell("B2").value), OPEN_RT.noTag);
+    assert.equal(sheet.getCell("B3").value, null);
+    assert.equal(sheet.getCell("B2").font?.name, "Kalbe Rounded");
+    assert.equal(sheet.getCell("B2").font?.size, 20);
+    assert.equal(sheet.getCell("B2").alignment?.indent, 1);
+    assert.equal(sheet.getCell("B2").alignment?.wrapText, true);
+    assert.equal(sheet.getCell("G2").alignment?.wrapText, true);
+    assert.equal(sheet.getCell("A1").font?.name, "Kalbe Rounded");
+    assert.equal(sheet.getCell("A1").font?.size, 20);
+    assert.equal(sheet.getCell("A1").font?.bold, true);
+    assert.ok(sheet.getRow(1).height >= 60);
+    assert.ok(sheet.getRow(2).height >= 60);
+    assert.match(sheet.headerFooter.oddHeader ?? "", /Kalbe Rounded,Bold.*RED TAG 2026/);
+    assert.match(sheet.headerFooter.oddHeader ?? "", /&R&"Kalbe Rounded"&26 30 Okt 2026/);
     assert.equal(sheet.pageSetup.paperSize, 9);
+    assert.equal(sheet.pageSetup.fitToPage, true);
+    assert.equal(sheet.pageSetup.fitToWidth, 1);
     assert.equal(workbook.getWorksheet("OT").state, "hidden");
+});
+
+test("teks panjang di semua kolom dibungkus dan tinggi baris naik", { skip: !existsSync(TEMPLATE_RT) }, async () => {
+    const long = {
+        ...OPEN_RT,
+        ditemukanOleh: "GUNTUR HERMAWAN SUHENDRA PRATAMA",
+        deskripsi: "Ditemukan abnormal pipa corong dustcollector yang menghubungkan dari atas dumping ke arah duscollector terdapat lubang kecil yang harus diperbaiki segera supaya tidak bocor dan mengotori area produksi filling"
+    };
+    const buffer = await fillTemplate("redTag", [OPEN_RT, long], { year: "2026", receivedAt: RECEIVED_AT });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet("RT");
+
+    assert.equal(sheet.getCell("F3").alignment?.wrapText, true);
+    assert.equal(sheet.getCell("G3").alignment?.wrapText, true);
+    assert.ok(sheet.getRow(3).height > sheet.getRow(2).height);
 });
