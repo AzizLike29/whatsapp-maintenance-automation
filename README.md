@@ -16,6 +16,7 @@ Receive WhatsApp Message        (whatsAppClient.js)
       Send One Summary Reply     (acknowledgementMessages.js)
   → Without them:
       Answer with Gemini AI      (aiAssistant.js, redTagSearch.js)
+      or export Open rows to PDF (exportReport.js, LibreOffice)
 ```
 
 - Messages from groups not listed in `ALLOWED_GROUP_IDS` are ignored.
@@ -110,9 +111,23 @@ Mention the bot without a number label to ask about Red Tag data:
 
 The AI only reads data; counting and filtering are done in code (`redTagSearch.js`) and the AI summarizes the result. It cannot close or reopen rows. Set `GEMINI_API_KEY` (free from [Google AI Studio](https://aistudio.google.com/apikey)) to enable it, and optionally `GEMINI_MODEL` (default `gemini-flash-lite-latest`). On the free tier Google may use submitted data to improve its models, and quotas can change.
 
+Ask for a PDF only when you want a file (`@Bot buatkan pdf RT PIC JSU`). Questions stay text. PDF uses local Excel templates, Kalbe Rounded from `fonts/`, and LibreOffice. SharePoint upload is optional and skipped until Microsoft login exists.
+
+## Folder layout
+
+| Path | What belongs there |
+| ---- | ------------------ |
+| `src/` | Bot code |
+| `test/` | Tests |
+| `Eksekusi PDF/` | Excel templates only (`Template Tag.xlsx`, `Template WR.xlsx`) |
+| `fonts/` | Kalbe Rounded files used in PDF |
+| `docs/contoh-laporan/` | Sample PDF and screenshots, not used at runtime |
+| `docs/fonts-kalbe-lain/` | Other Kalbe families, not used at runtime |
+
 ## Requirements
 
 - Node.js 20 or newer
+- LibreOffice (for Excel to PDF)
 - A dedicated WhatsApp number for the bot. This project uses [Baileys](https://github.com/WhiskeySockets/Baileys), an unofficial WhatsApp Web client; WhatsApp may ban numbers that use it, so do not use a personal number.
 - A Google Cloud service account with access to the target spreadsheet
 
@@ -158,7 +173,7 @@ The session is saved in `auth_info/`, so the QR code is only needed once. If the
 npm test
 ```
 
-Tests cover field extraction, tag matching, data search, the close/reopen flow for all three sheets, and the AI reply flow using fake dependencies; they do not call WhatsApp, Google, or Gemini.
+Tests cover field extraction, tag matching, data search, the close/reopen flow, PDF template fill, and the AI reply flow using fake dependencies. They do not call WhatsApp, Google, or Gemini. LibreOffice is used only if it is installed.
 
 ## Sensitive Files
 
