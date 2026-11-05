@@ -125,6 +125,7 @@ test("gagal jelas kalau LibreOffice tidak ada", () => {
 
 const SOFFICE = "C:\\Program Files\\LibreOffice\\program\\soffice.exe";
 const TEMPLATE_RT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "Eksekusi PDF", "RT & OT", "Template Tag.xlsx");
+const TEMPLATE_WR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "Eksekusi PDF", "WR", "Template WR.xlsx");
 
 test("LibreOffice mengubah Excel jadi PDF", { skip: !existsSync(SOFFICE) || !existsSync(TEMPLATE_RT), timeout: 60000 }, async () => {
     const xlsx = await fillTemplate("redTag", [OPEN_RT], { year: "2026", receivedAt: RECEIVED_AT });
@@ -201,6 +202,63 @@ test("isi template RT tanpa menimpa file asli, header dan data ikut terisi", { s
     assert.equal(sheet.pageSetup.fitToPage, true);
     assert.equal(sheet.pageSetup.fitToWidth, 1);
     assert.equal(workbook.getWorksheet("OT").state, "hidden");
+});
+
+test("WR judul Medium tanggal otomatis dan jarak Tahun PIC Description", { skip: !existsSync(TEMPLATE_WR) }, async () => {
+    const wr = {
+        tahun: "2026",
+        noTag: "183873",
+        deskripsi: "pembuatan valve",
+        department: "Produksi",
+        pic: "JSU",
+        tglClose: "",
+        keterangan: "on progres",
+        status: "Open"
+    };
+    const buffer = await fillTemplate("workRequest", [wr], { year: "2026", receivedAt: RECEIVED_AT });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet("Pakai ini");
+
+    assert.match(sheet.headerFooter.oddHeader ?? "", /Kalbe Rounded Medium.*WR PRINT 30OKT26/);
+    assert.doesNotMatch(sheet.headerFooter.oddHeader ?? "", /Bold/);
+    assert.equal(sheet.getCell("A2").alignment?.horizontal, "right");
+    assert.equal(sheet.getCell("A2").alignment?.indent, 1);
+    assert.equal(sheet.getCell("C2").alignment?.indent, 2);
+    assert.equal(sheet.getCell("E2").alignment?.indent, 2);
+});
+
+test("OT menambah jarak judul ke tabel dan indent Dept Line", { skip: !existsSync(TEMPLATE_RT) }, async () => {
+    const orange = {
+        no: "1283",
+        noTag: "OT/LINEB/04/2026/06399",
+        deskripsi: "handrail",
+        equipment: "HANDRAIL",
+        ditemukanOleh: "IQBAL",
+        diselesaikanOleh: "",
+        tglClose: "",
+        department: "Produksi",
+        line: "B",
+        tahun: "2026",
+        status: "Open"
+    };
+    const buffer = await fillTemplate("orangeTag", [orange], { year: "2026", receivedAt: RECEIVED_AT });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet("OT");
+
+    assert.equal(sheet.pageSetup.margins?.top, 1.4);
+    assert.equal(sheet.pageSetup.margins?.header, 0.45);
+    assert.equal(sheet.getCell("H2").alignment?.indent, 2);
+    assert.equal(sheet.getCell("I2").alignment?.indent, 2);
+    assert.equal(sheet.getCell("H2").alignment?.horizontal, "left");
+    assert.match(sheet.headerFooter.oddHeader ?? "", /ORANGE TAG 2026/);
+
+    const rt = await fillTemplate("redTag", [OPEN_RT], { year: "2026", receivedAt: RECEIVED_AT });
+    const rtBook = new ExcelJS.Workbook();
+    await rtBook.xlsx.load(rt);
+    const rtSheet = rtBook.getWorksheet("RT");
+    assert.notEqual(rtSheet.pageSetup.margins?.top, 1.4);
 });
 
 test("teks panjang di semua kolom dibungkus dan tinggi baris naik", { skip: !existsSync(TEMPLATE_RT) }, async () => {
