@@ -64,11 +64,15 @@ export const REPORT_TYPES = {
         folderKey: "wr",
         folderLabel: "WR",
         folderPath: "Data Sanghiang/Ops Adm/Template/WR",
-        header: (_year, dateText) => `&C&"Kalbe Rounded,Bold"&28WR PRINT &"Kalbe Rounded"&22${dateText}`
+        header: (_year, _dateText, receivedAt) => {
+            const { day, month, year } = jakartaParts(receivedAt);
+            const stamp = `${day}${MONTHS_FILE[month - 1]}${year.slice(-2)}`;
+            return `&C&"Kalbe Rounded Medium"&28WR PRINT ${stamp}`;
+        }
     }
 };
 
-// Tanggal pesan zona Jakarta
+// Pecah tanggal pesan zona Jakarta
 function jakartaParts(receivedAt) {
     const parts = Object.fromEntries(
         new Intl.DateTimeFormat("en-GB", {
@@ -131,7 +135,7 @@ export function buildDoneMessage({ year, filename, folderLabel, folderUrl }) {
     ].join("\n");
 }
 
-// Pesan PDF terkirim, upload menunggu IT
+// Pesan PDF terkirim saat upload menunggu IT
 export function buildPendingUploadMessage({ year, filename, folderLabel, folderUrl }) {
     return [
         `Berikut format PDF yang aku berikan untuk tahun ${year}.`,
@@ -242,13 +246,13 @@ function heightForLines(lines, fontSize) {
     return Math.max(point + 4, lines * (point + 4));
 }
 
-// Kata terpanjang, pecah hanya di spasi
+// Kata terpanjang tanpa pecah di tengah
 function longestToken(text) {
     const parts = String(text ?? "").split(/\s+/).filter(Boolean);
     return Math.max(1, ...parts.map((part) => part.length));
 }
 
-// Lebar kolom biar kata utuh tidak kepotong
+// Lebar kolom supaya kata utuh tidak kepotong
 function fitColumnWidth(sheet, col, texts, fontSize) {
     const longest = Math.max(1, ...texts.map(longestToken));
     sheet.getColumn(col).width = longest * ((Number(fontSize) || 20) / 11) * 1.35 + 3;
@@ -332,13 +336,58 @@ export async function fillTemplate(type, rows, { year, receivedAt }) {
     }
     sheet.autoFilter = undefined;
 
-    sheet.headerFooter.oddHeader = report.header(year, headerDate(receivedAt));
+    sheet.headerFooter.oddHeader = report.header(year, headerDate(receivedAt), receivedAt);
     sheet.pageSetup.paperSize = 9;
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
     sheet.pageSetup.fitToHeight = 0;
     sheet.pageSetup.printTitlesRow = "1:1";
     sheet.pageSetup.printArea = `A1:${report.lastCol}${lastRow}`;
+
+    // OT saja, judul tidak tenggelam dan Dept Line tidak mepet garis
+    if (type === "orangeTag") {
+        sheet.pageSetup.margins = {
+            ...(sheet.pageSetup.margins || {}),
+            header: 0.45,
+            top: 1.4
+        };
+        for (const field of ["department", "line"]) {
+            const col = report.fields.indexOf(field) + 1;
+            if (col <= 0) {
+                continue;
+            }
+            for (let r = 2; r <= lastRow; r++) {
+                const cell = sheet.getRow(r).getCell(col);
+                cell.alignment = {
+                    ...(cell.alignment || {}),
+                    horizontal: "left",
+                    indent: Math.max(Number(cell.alignment?.indent) || 0, 2)
+                };
+            }
+        }
+    }
+
+    // WR saja, jarak tipis di Tahun PIC dan Description
+    if (type === "workRequest") {
+        for (let r = 2; r <= lastRow; r++) {
+            const row = sheet.getRow(r);
+            const tahun = row.getCell(1);
+            tahun.alignment = {
+                ...(tahun.alignment || {}),
+                horizontal: "right",
+                indent: Math.max(Number(tahun.alignment?.indent) || 0, 1)
+            };
+            for (const field of ["deskripsi", "pic"]) {
+                const col = report.fields.indexOf(field) + 1;
+                const cell = row.getCell(col);
+                cell.alignment = {
+                    ...(cell.alignment || {}),
+                    horizontal: "left",
+                    indent: Math.max(Number(cell.alignment?.indent) || 0, 2)
+                };
+            }
+        }
+    }
 
     for (let col = lastColNumber + 1; col <= Math.max(sheet.columnCount, lastColNumber); col++) {
         sheet.getColumn(col).hidden = true;
@@ -538,7 +587,7 @@ export async function exportPdfReport({
     };
 }
 
-// Hubungkan PDF ke dashboard, LibreOffice, dan SharePoint
+// Hubungkan ekspor PDF ke dashboard LibreOffice dan SharePoint
 export function createExportReport({ redTagRepository, clientId, site = DEFAULT_SITE, folderUrls = DEFAULT_LINKS }) {
     return ({ type, requestedYear, receivedAt, filters }) => exportPdfReport({
         type,
